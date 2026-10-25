@@ -121,7 +121,7 @@ function featureDisplay(featureIndex, value, transaction, vendor) {
     return dollars(transaction.amount);
   }
   if (featureIndex === 1) {
-    return `${Math.expm1(value).toFixed(1)} times vendor median`;
+    return `${Math.expm1(value).toFixed(1)} times the vendor's usual payment`;
   }
   if (featureIndex === 2 || featureIndex === 3) {
     if (value) {
@@ -157,10 +157,10 @@ function percentileBelow(sortedValues, value) {
 function explainFeatures(features, sortedFeatures, transaction, vendor) {
   const labels = [
     "Payment amount",
-    "Amount relative to vendor median",
+    "Amount compared with this vendor's usual payments",
     "Weekend payment",
     "Round hundred-dollar amount",
-    "Vendor rarity",
+    "How often the city pays this vendor",
   ];
   const names = ["amount", "vendorRatio", "weekend", "roundAmount", "vendorRarity"];
   const explanations = features.map((value, featureIndex) => ({
@@ -175,10 +175,10 @@ function explainFeatures(features, sortedFeatures, transaction, vendor) {
 }
 function unusualPaymentReasons(transaction, typicalAmount, vendorAmounts, transactions) {
   const below = vendorAmounts.filter(amount => amount < transaction.amount).length;
-  const largerThan = Math.round(below / vendorAmounts.length * 100);
+  const largerThan = Math.floor(below / vendorAmounts.length * 100);
   const reasons = [
     `This payment is larger than ${largerThan}% of this vendor's payments.`,
-    `This vendor's usual middle-sized payment is ${dollars(typicalAmount)}; ` +
+    `This vendor's typical payment is ${dollars(typicalAmount)}; ` +
       `this payment was ${dollars(transaction.amount)}.`,
   ];
   const paymentDay = new Date(`${transaction.date}T00:00:00Z`).getUTCDay();
@@ -200,7 +200,7 @@ function isolationAlert(transaction, typicalAmount, vendorAmounts, transactions)
   const relativeAmount = (transaction.amount / Math.max(1, typicalAmount)).toFixed(1);
   const headline = `This ${dollars(transaction.amount)} payment to ` +
     `${transaction.vendorCanonical} is ${relativeAmount} times its usual ` +
-    `middle-sized payment of ${dollars(typicalAmount)}.`;
+    `payment of ${dollars(typicalAmount)}.`;
   return {
     type: "isolation", severity: "medium", score: transaction.ifScore,
     title: "Unusual payment", headline,

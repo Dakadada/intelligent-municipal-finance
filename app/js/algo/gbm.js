@@ -192,7 +192,7 @@ export function buildPatterns(transactions, categories, months, settings) {
             0.96,
             0.78 + ((targets[i] - upper) / Math.max(targets[i], 1)) * 0.15,
           ),
-          title: "Spending above seasonal pattern",
+          title: "Spending above the usual range",
           headline:
             `${category.name} spending in ${monthName(monthKey)} was ${dollars(targets[i])}; ` +
             `the usual range for that month is up to ${dollars(upper)}.`,

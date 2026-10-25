@@ -1,24 +1,30 @@
 <!doctype html>
-<meta charset="utf-8">
+<!-- Run the engine inside a browser and display its measured execution time.
+     This checks the actual JavaScript environment rather than relying on Bun.
+     Only sample data is loaded; the application frontend is not involved. -->
+<meta charset="utf-8" />
 <title>Engine browser verification</title>
 <pre id="result">Running browser benchmark…</pre>
 <script type="module">
-import { loadSampleLedger, runAnalysis } from '../app/js/engine.js';
-try {
-  const ledger = loadSampleLedger();
-  const start = performance.now();
-  const analysis = runAnalysis(ledger);
-  const runtime = performance.now() - start;
-  const output = {
-    runtimeMs: Math.round(runtime),
-    within1500ms: runtime < 1500,
-    txnCount: analysis.summary.txnCount,
-    alerts: analysis.alerts.length,
-    caught: analysis.evaluation.caught,
-    categories: analysis.forecast.categories.map(c => ({ name: c.name, status: c.status })),
-  };
-  document.querySelector('#result').textContent = JSON.stringify(output, null, 2);
-} catch (error) {
-  document.querySelector('#result').textContent = error.stack;
-}
+  import { loadSampleLedger, runAnalysis } from "../app/js/engine.js";
+  try {
+    const ledger = loadSampleLedger();
+    const start = performance.now();
+    const analysis = runAnalysis(ledger);
+    const runtime = performance.now() - start;
+    const output = {
+      runtimeMs: Math.round(runtime),
+      within1500ms: runtime < 1500,
+      txnCount: analysis.summary.txnCount,
+      alerts: analysis.alerts.length,
+      caught: analysis.evaluation.caught,
+      categories: analysis.forecast.categories.map((category) => ({
+        name: category.name,
+        status: category.status,
+      })),
+    };
+    document.querySelector("#result").textContent = JSON.stringify(output, null, 2);
+  } catch (error) {
+    document.querySelector("#result").textContent = error.stack;
+  }
 </script>

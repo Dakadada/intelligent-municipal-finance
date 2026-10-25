@@ -33,7 +33,7 @@ function createAlert(type, rows, headline, reasons, extra = {}) {
     duplicate: "Possible duplicate payment",
     split: "Possible split purchase",
     "above-similar": "Payment above comparable invoices",
-    "vendor-increase": "Vendor price increase",
+    "vendor-increase": "Vendor cost increase",
     "new-vendor": "Large first payment",
   };
   return {
@@ -72,6 +72,10 @@ function detectDuplicates({ rows, vendor, settings, add }) {
       const sameInvoice = Boolean(
         firstPayment.invoice && firstPayment.invoice === secondPayment.invoice,
       );
+      // Cheap check first: most pairs have different amounts and different invoices.
+      if (!sameInvoice && firstPayment.amount !== secondPayment.amount) {
+        continue;
+      }
       const gap = days(firstPayment.date, secondPayment.date);
       const suspiciousAmount =
         firstPayment.amount === secondPayment.amount &&
@@ -166,7 +170,7 @@ function detectSplits({ rows, vendor, settings, add }) {
     group,
     headline,
     [
-      `The vendor's typical below-threshold invoice is ${dollars(typicalSmallInvoice)}.`,
+      `The vendor's usual invoice below the approval limit is ${dollars(typicalSmallInvoice)}.`,
       `${group.length} invoices describe the same work; ` +
         "check whether they are one purchase.",
     ],
@@ -274,7 +278,32 @@ function detectAboveSimilar({ rows, vendor, settings, add }) {
     }
   }
 }
-function detectMonthlyVendorIncrease({ rows, vendor, settings, add }) {
+function detectRecentQuarterIncrease({ rows, vendor, settings, add }) {
+  const recent = vendor.monthly.slice(-3);
+  const prior = vendor.monthly.slice(-15, -12);
+  const threshold = Math.max(25, settings.vendorIncreasePct);
+  const persistent = recent.every((entry, i) => prior[i].total > 0 &&
+    entry.total > prior[i].total * (1 + threshold / 100));
+  const recentTotal = recent.reduce((total, entry) => total + entry.total, 0);
+  const priorTotal = prior.reduce((total, entry) => total + entry.total, 0);
+  if (!persistent || recentTotal - priorTotal <= 2000) return;
+  const changePercent = (recentTotal / priorTotal - 1) * 100;
+  const recentMonths = new Set(recent.map(entry => entry.month));
+  const payments = rows.filter(row => recentMonths.has(row.date.slice(0, 7)));
+  const headline = `${vendor.canonical}'s spending over the latest 3 months rose ` +
+    `${Math.round(changePercent)}%, from ${dollars(priorTotal)} to ${dollars(recentTotal)} ` +
+    "compared with those same months a year earlier.";
+  add("vendor-increase", payments, headline, [
+    `Each of the 3 months was more than ${threshold}% above the same month a year earlier.`,
+    "Verify quantities and unit prices to determine why costs are rising.",
+  ], {
+    detectors: ["vendor-trend"], score: Math.min(0.95, 0.75 + changePercent / 500),
+    amount: recentTotal - priorTotal,
+  });
+}
+
+function detectMonthlyVendorIncrease(context) {
+  const { rows, vendor, settings, add } = context;
   if (!(vendor.monthly?.length >= 24)) {
     return;
   }
@@ -295,6 +324,7 @@ function detectMonthlyVendorIncrease({ rows, vendor, settings, add }) {
     higherMonths >= 7 &&
     recentTotal - priorTotal >= 750
   )) {
+    detectRecentQuarterIncrease(context);
     return;
   }
   const elevatedMonths = new Set(recentMonths.filter((monthEntry, i) =>
@@ -344,7 +374,7 @@ function detectVendorIncrease(context) {
     recent,
     headline,
     [
-      "Comparison uses the preceding 12 months as the baseline.",
+      "The comparison covers the 12 months before the latest year.",
       `At the recent invoice count, the annual increase is approximately ` +
         `${dollars(annualIncrease)}.`,
     ],

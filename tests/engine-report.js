@@ -1,50 +1,54 @@
-// Run with bun tests/engine-report.js for a reproducible judge-facing audit.
+// Print the complete sample audit for a judge or a developer to inspect.
+// Counts, concrete headlines, forecasts, and contract scores make unexpected
+// changes visible without needing to understand the browser UI.
 import {
   loadSampleLedger,
   runAnalysis,
   analyzeContract,
   SAMPLE_CONTRACTS,
 } from "../app/js/engine.js";
-const start = performance.now(),
-  a = runAnalysis(loadSampleLedger()),
-  runtime = performance.now() - start;
-console.log("Sample transactions:", a.summary.txnCount);
+const start = performance.now();
+const analysis = runAnalysis(loadSampleLedger());
+const runtime = performance.now() - start;
+console.log("Sample transactions:", analysis.summary.txnCount);
 console.log(
   "Counts by type/severity:",
   JSON.stringify(
-    a.alerts.reduce((s, v) => {
-      const key = v.type + "/" + v.severity;
-      s[key] = (s[key] ?? 0) + 1;
-      return s;
+    analysis.alerts.reduce((counts, alert) => {
+      const key = alert.type + "/" + alert.severity;
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
     }, {}),
     null,
     2,
   ),
 );
-console.log("Evaluation:", JSON.stringify(a.evaluation, null, 2));
-console.log("Alert total:", a.alerts.length, "Runtime ms:", runtime.toFixed(1));
+console.log("Evaluation:", JSON.stringify(analysis.evaluation, null, 2));
+console.log("Alert total:", analysis.alerts.length, "Runtime ms:", runtime.toFixed(1));
 console.log("Top 15 headlines:");
-a.alerts.slice(0, 15).forEach((v) => console.log(v.id, v.headline));
+analysis.alerts.slice(0, 15).forEach((alert) => console.log(alert.id, alert.headline));
 console.log(
   "Forecast total:",
-  JSON.stringify({ ...a.forecast.total, months: undefined }),
+  JSON.stringify({ ...analysis.forecast.total, months: undefined }),
 );
 console.table(
-  a.forecast.categories.map((c) => ({
-    category: c.name,
-    budget: c.budget,
-    projected: Math.round(c.projected),
-    status: c.status,
+  analysis.forecast.categories.map((category) => ({
+    category: category.name,
+    budget: category.budget,
+    projected: Math.round(category.projected),
+    status: category.status,
   })),
 );
 console.log(
   "Contract scores:",
-  SAMPLE_CONTRACTS.map((c) => ({
-    id: c.id,
-    score: analyzeContract(c.text).score,
-    grade: analyzeContract(c.text).grade,
+  SAMPLE_CONTRACTS.map((contract) => ({
+    id: contract.id,
+    score: analyzeContract(contract.text).score,
+    grade: analyzeContract(contract.text).grade,
   })),
 );
-if (process.argv.includes("--all"))
-  for (const v of a.alerts)
-    console.log(v.id, v.type, v.txnIds.length, v.headline);
+if (process.argv.includes("--all")) {
+  for (const alert of analysis.alerts) {
+    console.log(alert.id, alert.type, alert.txnIds.length, alert.headline);
+  }
+}

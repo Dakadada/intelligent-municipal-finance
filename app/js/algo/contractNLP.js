@@ -248,7 +248,7 @@ function findClauseMatches(sentences, context) {
   }
   return findings;
 }
-function suitabilityScore(findings, sentences) {
+function suitabilityScore(findings, sentences, terms) {
   let score = 100;
   for (const finding of findings) {
     if (finding.severity === "high") {
@@ -259,6 +259,10 @@ function suitabilityScore(findings, sentences) {
       }
     }
   }
+  // Automatic renewal compounds an uncapped annual escalator without a new decision.
+  const renewsWithUncappedIncrease = terms.autoRenew && terms.escalatorPct > 0 &&
+    findings.some(finding => finding.id === "uncapped-price");
+  if (renewsWithUncappedIncrease) score -= 10;
   // Classifier contributes modestly; auditable rules dominate the suitability score.
   if (sentences.length) {
     score -= Math.round(
@@ -273,35 +277,80 @@ function suitabilityScore(findings, sentences) {
   score = Math.max(0, Math.min(100, score));
   return score;
 }
-function suitabilityGrade(score) {
-  if (score >= 90) {
+export function suitabilityGrade(score) {
+  if (score >= 85) {
     return "A";
   }
-  if (score >= 80) {
+  if (score >= 70) {
     return "B";
   }
-  if (score >= 70) {
+  if (score >= 55) {
     return "C";
   }
-  if (score >= 60) {
+  if (score >= 40) {
     return "D";
   }
   return "F";
 }
+function joinTerms(phrases) {
+  if (phrases.length === 1) return phrases[0];
+  if (phrases.length === 2) return phrases[0] + " and " + phrases[1];
+  return phrases.slice(0, -1).join(", ") + ", and " + phrases.at(-1);
+}
+
+function contractVerdict(findings, terms) {
+  let escalation = "allows price increases without a cap";
+  if (terms.escalatorPct !== null) {
+    escalation = `raises the price ${terms.escalatorPct}% a year with no cap`;
+  }
+  const risks = {
+    "auto-renew": "renews automatically without a new bid",
+    "uncapped-price": escalation,
+    "current-rates": "lets the vendor set future renewal prices",
+    "time-materials": "allows hourly billing without a spending limit",
+    penalty: "charges a penalty for ending early",
+    unilateral: "lets the vendor change prices or services without city approval",
+    vague: "leaves the required work undefined",
+    "long-term": `commits the city for ${terms.termMonths} months`,
+  };
+  const protections = {
+    bid: "competitively bid", cap: "price-capped",
+    nte: "subject to a total spending limit",
+    convenience: "allows the city to end the agreement without a penalty",
+    sla: "sets measurable service standards", audit: "gives the city audit rights",
+  };
+  const riskOrder = ["auto-renew", "uncapped-price", "time-materials", "penalty",
+    "unilateral", "current-rates"];
+  const highRisks = findings.filter(finding => finding.severity === "high")
+    .sort((first, second) => riskOrder.indexOf(first.id) - riskOrder.indexOf(second.id));
+  const otherRisks = findings.filter(finding => finding.severity === "medium");
+  const riskyTerms = [...highRisks, ...otherRisks].slice(0, 3)
+    .map(finding => risks[finding.id]).filter(Boolean);
+  let phrases = riskyTerms;
+  if (!phrases.length) {
+    // Prefer the procurement, spending and exit protections in a short summary.
+    phrases = ["bid", "cap", "nte", "convenience", "sla", "audit"]
+      .filter(id => findings.some(finding => finding.id === id))
+      .slice(0, 4).map(id => protections[id]);
+  }
+  if (!phrases.length) {
+    return "No specific purchasing risks or protections were found in the supplied text.";
+  }
+  const sentence = joinTerms(phrases);
+  return sentence[0].toUpperCase() + sentence.slice(1) + ".";
+}
+
 export function analyzeContract(text) {
   const sentences = splitSentences(text);
   const context = extractTerms(text);
   const { terms } = context;
   const findings = findClauseMatches(sentences, context);
-  const score = suitabilityScore(findings, sentences);
+  const score = suitabilityScore(findings, sentences, terms);
   const grade = suitabilityGrade(score);
   return {
     score,
     grade,
-    verdict:
-      `${findings.filter((finding) => finding.severity === "high").length}` +
-      ` high-risk terms and ${findings.filter((finding) => finding.severity === "good").length}` +
-      ` protective terms found; suitability score ${score} out of 100.`,
+    verdict: contractVerdict(findings, terms),
     terms,
     findings,
     sentences,
