@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Red Pen · opening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Public+Sans:wght@400;600&family=Caveat:wght@700&display=swap">
+<style>
+  /* 1920x1080 film frame. The 3D ledger is the subject; type is quiet and
+     sits in the letterbox like a title sequence. */
+  :root {
+    --night: #070b09;
+    --ink-light: #e8efe9;
+    --dim: #8fa598;
+    --pencil: #ff5a4a;
+    --paper: #eef3ee;
+    --ink: #15212a;
+    --serif: "Source Serif 4", Georgia, serif;
+    --sans: "Public Sans", system-ui, sans-serif;
+    --pen: "Caveat", cursive;
+  }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--night); }
+  canvas { position: absolute; inset: 0; }
+  .bar { position: absolute; left: 0; right: 0; height: 138px; background: #000; z-index: 3; }
+  .bar.top { top: 0; } .bar.bottom { bottom: 0; }
+  .line {
+    position: absolute; left: 0; right: 0; z-index: 4; text-align: center;
+    font-family: var(--serif); color: var(--ink-light); font-size: 54px; letter-spacing: -0.005em;
+    opacity: 0; will-change: opacity, transform;
+  }
+  .line.low { bottom: 196px; }
+  .line em { font-style: italic; color: #fff; }
+  .line .red { color: var(--pencil); }
+  .small { font-family: var(--sans); font-size: 21px; letter-spacing: .28em; text-transform: uppercase; color: var(--dim); }
+  #card {
+    position: absolute; inset: 0; z-index: 6; background: var(--paper); opacity: 0;
+    display: grid; place-content: center; gap: 34px; justify-items: start; padding: 0 260px;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 63px, #d4e1d6 63px 64px);
+  }
+  #card h1 { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 118px; line-height: 1.04; color: var(--ink); letter-spacing: -0.02em; }
+  #card .circled { position: relative; color: #c8312b; white-space: nowrap; }
+  #card .circled svg { position: absolute; left: -3%; top: 12%; width: 106%; height: 92%; overflow: visible; }
+  #card .sig { display: flex; gap: 22px; align-items: center; font-family: var(--sans); color: #47575e; font-size: 26px; }
+  #card .sig b { font-family: var(--serif); font-size: 40px; color: var(--ink); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="bar top" id="bar-top"></div>
+<div class="bar bottom" id="bar-bottom"></div>
+
+<div class="line low" id="t1"><span class="small">Willow Creek, Iowa · population 4,812</span></div>
+<div class="line low" id="t2">Five years of a small town's spending.</div>
+<div class="line low" id="t3">Iowa has <em>947</em> cities. Most can't afford a financial analyst.</div>
+<div class="line low" id="t4">So no one reads every line.</div>
+<div class="line low" id="t5"><span class="red" style="font-family:var(--pen);font-size:76px">Red Pen does.</span></div>
+
+<div id="card">
+  <h1 id="card-h1"></h1>
+  <div class="sig"><svg width="58" height="58" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="12" fill="#15212a"/><path d="M14 22h36M14 32h36M14 42h36" stroke="#a9c2ae" stroke-width="2"/><path d="M12 36c2-14 34-18 40-8 5 9-14 18-30 15-9-2-11-8-6-14" fill="none" stroke="#ff6a5c" stroke-width="3.5" stroke-linecap="round"/></svg><b>Red Pen</b><span>Intelligent Municipal Finance</span></div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { loadSampleLedger, runAnalysis } from "../app/js/engine.js";
+import { loopPath, loopPoints } from "../app/js/ui/pen.js";
+import { makeRng } from "../app/js/algo/rng.js";
+
+const W = 1920, H = 1080;
+export const DURATION = 27;
+
+// ---------- real data: the same ledger and findings the app shows ----------
+const ledger = loadSampleLedger();
+const analysis = runAnalysis(ledger);
+const flaggedIds = new Set(analysis.alerts.filter((a) => a.txnIds.length).map((a) => a.txnIds[0]));
+const txns = analysis.txns;
+const cats = [...new Set(txns.map((t) => t.categoryId))];
+const t0 = Date.parse(txns[0].date), t1 = Date.parse(txns.at(-1).date);
+const rng = makeRng(7);
+const LEN = 64, LANE = 2.1;
+const pos = (t) => new THREE.Vector3(
+  ((Date.parse(t.date) - t0) / (t1 - t0)) * LEN - LEN / 2,
+  (Math.log10(Math.max(t.amount, 50)) - 1.7) * 3.4,
+  (cats.indexOf(t.categoryId) - (cats.length - 1) / 2) * LANE + (rng() - 0.5) * 0.5,
+);
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070b09);
+scene.fog = new THREE.FogExp2(0x070b09, 0.018);
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.05, 400);
+// Loops live in an overlay scene drawn after depth of field, so they stay crisp.
+const overlay = new THREE.Scene();
+
+// ---------- the ledger cloud ----------
+const N = txns.length;
+const geo = new THREE.BufferGeometry();
+const base = new Float32Array(N * 3), flat = new Float32Array(N * 3), flag = new Float32Array(N), ignite = new Float32Array(N), seed = new Float32Array(N);
+const flaggedPts = [];
+txns.forEach((t, i) => {
+  const p = pos(t);
+  base.set([p.x, p.y, p.z], i * 3);
+  flat.set([p.x, 0.02, p.z], i * 3);
+  flag[i] = flaggedIds.has(t.id) ? 1 : 0;
+  seed[i] = rng();
+  if (flag[i]) flaggedPts.push({ i, p });
+});
+flaggedPts.sort((a, b) => a.p.x - b.p.x);
+geo.setAttribute("position", new THREE.BufferAttribute(base, 3));
+geo.setAttribute("aFlat", new THREE.BufferAttribute(flat, 3));
+geo.setAttribute("flag", new THREE.BufferAttribute(flag, 1));
+geo.setAttribute("ignite", new THREE.BufferAttribute(ignite, 1));
+geo.setAttribute("seed", new THREE.BufferAttribute(seed, 1));
+
+const pointsMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 }, uDim: { value: 1 }, uFlatten: { value: 0 }, uReveal: { value: 0 }, uScanX: { value: -999 } },
+  vertexShader: `
+    attribute vec3 aFlat; attribute float flag; attribute float ignite; attribute float seed;
+    uniform float uTime, uFlatten, uReveal, uScanX; varying float vFlag; varying float vIgnite; varying float vAlpha; varying float vScan;
+    void main() {
+      vec3 p = mix(position, aFlat, uFlatten);
+      p.y += sin(uTime * 0.6 + seed * 6.283) * 0.05 * (1.0 - uFlatten);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float size = mix(5.0, 9.0, seed) + ignite * 16.0;
+      gl_PointSize = size * (34.0 / -mv.z);
+      vFlag = flag; vIgnite = ignite;
+      vScan = exp(-pow((position.x - uScanX) * 1.3, 2.0));
+      // reveal ripples outward from the first point the camera starts on
+      vAlpha = smoothstep(seed * 0.9, seed * 0.9 + 0.1, uReveal);
+    }`,
+  fragmentShader: `
+    uniform float uDim; varying float vFlag; varying float vIgnite; varying float vAlpha; varying float vScan;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float a = smoothstep(0.5, 0.0, d);
+      vec3 ledger = vec3(0.62, 0.74, 0.66);
+      vec3 red = vec3(1.6, 0.38, 0.30);
+      vec3 col = mix(ledger * uDim + vec3(0.9, 0.85, 0.8) * vScan * 0.9, red, vIgnite);
+      gl_FragColor = vec4(col, a * vAlpha * mix(0.75, 1.0, vIgnite));
+    }`,
+});
+scene.add(new THREE.Points(geo, pointsMat));
+
+// ---------- ledger rules: one faint line per category lane, fiscal-year ticks ----------
+const rules = new THREE.Group();
+const ruleMat = new THREE.LineBasicMaterial({ color: 0x2f4a3c, transparent: true, opacity: 0.55 });
+cats.forEach((_, k) => {
+  const z = (k - (cats.length - 1) / 2) * LANE;
+  rules.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-LEN / 2 - 2, 0, z), new THREE.Vector3(LEN / 2 + 2, 0, z)]), ruleMat));
+});
+for (let y = 2022; y <= 2026; y++) {
+  const x = ((Date.UTC(y - 1, 6, 1) - t0) / (t1 - t0)) * LEN - LEN / 2;
+  rules.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, 0, -cats.length * LANE / 2), new THREE.Vector3(x, 0, cats.length * LANE / 2)]), ruleMat));
+}
+scene.add(rules);
+
+// ---------- the red pencil: a reading beam that sweeps the books in time order ----------
+const X0 = -LEN / 2 - 3, X1 = LEN / 2 + 3;
+const depth = cats.length * LANE + 6;
+const beamMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
+  uniforms: { uOpacity: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform float uOpacity; varying vec2 vUv;
+    void main(){
+      float core = exp(-pow((vUv.x - 0.5) * 14.0, 2.0));
+      float fadeY = smoothstep(1.0, 0.0, vUv.y) * smoothstep(0.0, 0.06, vUv.y);
+      float edges = smoothstep(0.0, 0.08, vUv.x) * smoothstep(1.0, 0.92, vUv.x);
+      vec3 col = vec3(1.9, 0.42, 0.32) * core + vec3(0.5, 0.06, 0.04) * (1.0 - core);
+      gl_FragColor = vec4(col, (core * 0.85 + 0.05) * fadeY * uOpacity);
+    }`,
+});
+// Plane spans the lanes (z) and height (y); it is thin along x.
+const beamSide = new THREE.Mesh(new THREE.PlaneGeometry(depth, 16), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false, uniforms: beamMat.uniforms, vertexShader: beamMat.vertexShader, fragmentShader: `uniform float uOpacity; varying vec2 vUv; void main(){ float fadeY = smoothstep(1.0, 0.0, vUv.y) * smoothstep(0.0, 0.04, vUv.y); float edges = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x); gl_FragColor = vec4(vec3(1.6, 0.35, 0.26), 0.035 * fadeY * fadeY * edges * uOpacity); }` }));
+beamSide.rotation.y = Math.PI / 2;
+const beamWrap = new THREE.Group();
+beamWrap.add(beamSide);
+beamSide.position.y = 8;
+scene.add(beamWrap);
+// The pencil tip: a bright line where the beam meets the ledger floor.
+const tip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, depth - 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 0.8, 0.6), toneMapped: false }));
+scene.add(tip);
+
+// hand-drawn loops around each flagged point (billboards, drawn on as the pen passes)
+const flagX = flaggedPts.map(({ p }) => p.x);
+const loops = flaggedPts.map(({ p }, k) => {
+  const pts = loopPoints(1.5, 1.0, k + 3).map(([x, y]) => new THREE.Vector3(x - 0.75, -(y - 0.5), 0));
+  const smooth = new THREE.CatmullRomCurve3(pts).getPoints(90);
+  const g = new LineGeometry();
+  g.setPositions(smooth.flatMap((v) => [v.x, v.y, v.z]));
+  const mat = new LineMaterial({ color: 0xff5a4a, linewidth: 3.2, transparent: true, toneMapped: false, depthTest: false });
+  mat.resolution.set(W, H);
+  const line = new Line2(g, mat);
+  line.position.copy(p);
+  line.renderOrder = 5;
+  g.instanceCount = 0;
+  overlay.add(line);
+  return line;
+});
+
+// ---------- film post stack: DOF -> bloom -> grade (vignette, grain) ----------
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(1);
+composer.setSize(W, H);
+composer.addPass(new RenderPass(scene, camera));
+const bokeh = new BokehPass(scene, camera, { focus: 10, aperture: 0.0025, maxblur: 0.012 });
+composer.addPass(bokeh);
+const overlayPass = new RenderPass(overlay, camera);
+overlayPass.clear = false;
+overlayPass.clearDepth = true;
+composer.addPass(overlayPass);
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.9, 0.55, 0.82);
+composer.addPass(bloom);
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uFade: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uFade; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uTime * 7.13) * 43758.5453); }
+    void main(){
+      vec2 c = vUv - 0.5;
+      float ca = 0.0012 * length(c) * 2.0;
+      vec3 col;
+      col.r = texture2D(tDiffuse, vUv + c * ca).r;
+      col.g = texture2D(tDiffuse, vUv).g;
+      col.b = texture2D(tDiffuse, vUv - c * ca).b;
+      col *= smoothstep(0.95, 0.25, length(c * vec2(1.0, 0.82)));   // vignette
+      col = mix(col, col * vec3(0.96, 1.02, 1.0), 0.5);              // cool-green grade
+      col += (hash(vUv * 1000.0) - 0.5) * 0.045;                      // grain
+      gl_FragColor = vec4(col * uFade, 1.0);
+    }`,
+});
+composer.addPass(grade);
+composer.addPass(new OutputPass());
+
+// ---------- timeline helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const lerp = (a, b, x) => a + (b - a) * x;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// Camera rig: keyframed position + look target, eased between keys.
+const firstPt = pos(txns[Math.floor(N * 0.42)]);
+const KEYS = [
+  { t: 0, p: firstPt.clone().add(V(0.4, 0.15, 1.1)), l: firstPt, f: 1.2 },
+  { t: 5, p: V(-6, 9, 34), l: V(0, 3, 0), f: 34 },
+  { t: 11, p: V(26, 5.5, 20), l: V(4, 4, -2), f: 28 },
+  { t: 14, p: V(-34, 7, 16), l: V(-18, 5, 0), f: 20 },
+  // pen sequence handled by tracking, then crane up
+  { t: 21.2, p: V(28, 12, 18), l: V(12, 5, 0), f: 20 },
+  { t: 24.5, p: V(0, 78, 0.01), l: V(0, 0, 0), f: 78 },
+];
+function rig(t) {
+  let k = 0;
+  while (k < KEYS.length - 2 && t > KEYS[k + 1].t) k++;
+  const a = KEYS[k], b = KEYS[k + 1];
+  const x = ease(ramp(t, a.t, b.t));
+  return { p: a.p.clone().lerp(b.p, x), l: a.l.clone().lerp(b.l, x), f: lerp(a.f, b.f, x) };
+}
+
+const text = (id, t, a, b, fade = 0.7) => {
+  const el = document.getElementById(id);
+  const o = clamp(Math.min((t - a) / fade, (b - t) / fade));
+  el.style.opacity = o;
+  el.style.transform = `translateY(${(1 - easeOut(clamp((t - a) / 1.2))) * 14}px)`;
+};
+
+let cardBuilt = false;
+function buildCard() {
+  const read = analysis.summary.txnCount.toLocaleString("en-US");
+  const need = analysis.alerts.length;
+  document.getElementById("card-h1").innerHTML =
+    `${read} transactions read.<br><span class="circled">${need} need you.<svg viewBox="0 0 200 60" preserveAspectRatio="none"><path id="card-loop" d="${loopPath(200, 60, need)}" fill="none" stroke="#c8312b" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg></span>`;
+  cardBuilt = true;
+}
+
+// ---------- render one exact frame at time t (seconds) ----------
+window.renderAt = (t) => {
+  if (!cardBuilt) buildCard();
+  pointsMat.uniforms.uTime.value = t;
+  pointsMat.uniforms.uReveal.value = easeOut(ramp(t, 0.6, 5.5));
+  pointsMat.uniforms.uDim.value = lerp(1, 0.38, ease(ramp(t, 11.5, 14)));
+  pointsMat.uniforms.uFlatten.value = ease(ramp(t, 21.5, 24.5));
+  ruleMat.opacity = 0.7 * ramp(t, 2, 6);
+
+  const su = ease(ramp(t, 14.2, 20.6));
+  const scanX = lerp(X0, X1, su);
+  // camera: keyframes (updated first so billboards face this frame's camera), with the pen sequence tracking the pencil's head
+  let { p, l, f } = rig(t);
+  if (t > 14 && t < 21.2) {
+    const w = ease(ramp(t, 14, 15.2)) * (1 - ease(ramp(t, 20.2, 21.2)));
+    const trackP = V(scanX - 16, 11, 27);
+    const trackL = V(scanX + 3, 3, 0);
+    p = p.lerp(trackP, w);
+    l = l.lerp(trackL, w);
+    f = lerp(f, trackP.distanceTo(V(scanX, 3, 0)), w);
+  }
+  camera.position.copy(p);
+  camera.lookAt(l);
+  camera.updateMatrixWorld();
+  // the beam sweeps the books 14.2s -> 20.6s
+  pointsMat.uniforms.uScanX.value = t > 14.1 && t < 20.8 ? scanX : -999;
+  beamWrap.position.x = scanX;
+  tip.position.set(scanX, 0.02, 0);
+  beamMat.uniforms.uOpacity.value = ramp(t, 14, 14.6) * (1 - ramp(t, 20.3, 20.9));
+  tip.visible = t > 14 && t < 20.9;
+  const ig = geo.attributes.ignite;
+  flaggedPts.forEach(({ i }, k) => {
+    const passed = clamp((scanX - flagX[k]) * 1.6);
+    ig.array[i] = passed;
+    const loop = loops[k];
+    loop.geometry.instanceCount = Math.floor(easeOut(clamp((scanX - flagX[k]) * 0.5)) * 90);
+    loop.material.opacity = 1 - ramp(t, 22.5, 24);
+    loop.quaternion.copy(camera.quaternion);
+    const fl = pointsMat.uniforms.uFlatten.value;
+    loop.position.copy(flaggedPts[k].p).lerp(V(flaggedPts[k].p.x, 0.02, flaggedPts[k].p.z), fl);
+  });
+  ig.needsUpdate = true;
+
+  bokeh.uniforms.focus.value = f;
+  bokeh.uniforms.aperture.value = lerp(0.0045, 0.0012, ramp(t, 0, 5)) * lerp(1, 0.3, ramp(t, 14, 15) * (1 - ramp(t, 20.5, 21))) * (t > 21 ? 1 - ramp(t, 21, 23) : 1);
+  bloom.strength = lerp(0.55, 0.85, ramp(t, 14, 16)) * (1 - 0.5 * ramp(t, 22, 24));
+
+  grade.uniforms.uTime.value = Math.floor(t * 24) / 24; // grain changes at film rate
+  grade.uniforms.uFade.value = ramp(t, 0, 0.8) * (1 - ramp(t, 24.2, 25));
+
+  // type
+  text("t1", t, 1.0, 4.6);
+  text("t2", t, 5.2, 9.6);
+  text("t3", t, 9.9, 13.6);
+  text("t4", t, 12.4, 14.4, 0.5);
+  text("t5", t, 16.6, 20.6);
+  document.getElementById("t3").style.opacity = Math.min(+document.getElementById("t3").style.opacity, 1 - ramp(t, 12.2, 12.6));
+
+  // letterbox opens out for the final card
+  const bars = 138 * (1 - ease(ramp(t, 24.2, 25.2)));
+  document.getElementById("bar-top").style.height = `${bars}px`;
+  document.getElementById("bar-bottom").style.height = `${bars}px`;
+
+  // end card: paper fades up, the pencil circles the number
+  const card = document.getElementById("card");
+  card.style.opacity = ramp(t, 24.4, 25.2);
+  const loopEl = document.getElementById("card-loop");
+  if (loopEl) {
+    const len = 620;
+    loopEl.style.strokeDasharray = len;
+    loopEl.style.strokeDashoffset = len * (1 - ease(ramp(t, 25.4, 26.4)));
+  }
+
+  composer.render();
+};
+
+window.hookReady = true;
+window.renderAt(0);
+</script>
+</body>
+</html>

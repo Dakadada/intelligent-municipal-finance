@@ -12,6 +12,11 @@ const f = (n) => n.toFixed(1);
 // A loose loop around a box of size w x h, overshooting where it closes,
 // the way a hand circles a number on paper.
 export function loopPath(w, h, seed = 1) {
+  return smooth(loopPoints(w, h, seed));
+}
+
+// The raw points of the loop, before smoothing (used by the video's 3D scene).
+export function loopPoints(w, h, seed = 1) {
   const rng = makeRng(seed * 7919 + 13);
   const cx = w / 2;
   const cy = h / 2;
@@ -27,7 +32,7 @@ export function loopPath(w, h, seed = 1) {
     const drift = (i / steps) * 0.05; // second pass lands slightly outside the first
     pts.push([cx + Math.cos(t) * rx * (wob + drift), cy + Math.sin(t) * ry * (wob + drift * 0.6) - drift * h * 0.1]);
   }
-  return smooth(pts);
+  return pts;
 }
 
 // A quick underline with a slight upward flick at the end.
