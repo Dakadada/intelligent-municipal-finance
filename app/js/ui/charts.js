@@ -173,7 +173,7 @@ export function runwayChart(el, fc, { compact = false, label = "Cumulative spend
       const cx = x(i);
       const cy = y(fc.budget);
       crossing = `${chartLoop(cx, cy, compact ? 10 : 13, i + 11, 0.7)}
-        <text x="${f(cx)}" y="${f(cy + (compact ? 26 : 30))}" text-anchor="middle" style="fill:var(--pencil);font:700 ${compact ? 15 : 17}px var(--f-pen)">runs out here</text>`;
+        <text x="${f(cx > W - 90 ? cx + 8 : cx)}" y="${f(cy + (compact ? 26 : 30))}" text-anchor="${cx > W - 90 ? "end" : "middle"}" style="fill:var(--pencil);font:700 ${compact ? 15 : 17}px var(--f-pen)">runs out here</text>`;
     }
   }
   const budgetLine = fc.budget
@@ -233,7 +233,7 @@ export function vendorStrip(el, txns, focusIds = [], { normal } = {}) {
   const bandSvg = normal
     ? `<rect x="${L}" y="${f(y(normal.hi))}" width="${W - L - R}" height="${f(Math.max(2, y(normal.lo) - y(normal.hi)))}" fill="var(--model-wash)"/>
        <line x1="${L}" x2="${W - R}" y1="${f(y(normal.mid))}" y2="${f(y(normal.mid))}" stroke="var(--model)" stroke-width="1.4" stroke-dasharray="4 3"/>
-       <text x="${W - R}" y="${f(y(normal.hi) - 6)}" text-anchor="end" style="fill:var(--model)">typical ${moneyShort(normal.lo)}–${moneyShort(normal.hi)}</text>`
+`
     : "";
   let k = 0;
   const dots = txns.map((t, i) => {

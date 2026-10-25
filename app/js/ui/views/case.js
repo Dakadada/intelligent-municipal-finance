@@ -1,7 +1,7 @@
 // Case file: one finding, explained well enough that a clerk could defend
 // the decision at a council meeting.
 
-import { esc, money, money2, date, weekday, timestamp } from "../format.js";
+import { esc, money, money2, moneyShort, date, weekday, timestamp } from "../format.js";
 import { vendorStrip } from "../charts.js";
 import { store } from "../store.js";
 import { TICKS } from "../pen.js";
@@ -71,7 +71,7 @@ export function caseView(el, app, [id]) {
 
         <div class="section" style="gap:8px">
           <div class="section-head"><span class="eyebrow">Every invoice from ${esc(vendor?.canonical ?? al.vendor)}</span>
-            <span class="chart-legend"><span><i class="flag"></i>this finding</span>${normal ? `<span><i class="band"></i>typical range</span>` : ""}</span></div>
+            <span class="chart-legend"><span><i class="flag"></i>this finding</span>${normal ? `<span><i class="band"></i>typical ${moneyShort(normal.lo)}–${moneyShort(normal.hi)}</span>` : ""}</span></div>
           <div id="strip"></div>
           ${vendor && vendor.aliases.length > 1 ? `<p class="fineprint">Billed under ${vendor.aliases.length} spellings: ${vendor.aliases.map((n) => `“${esc(n)}”`).join(", ")}. Red Pen treats them as one vendor.</p>` : ""}
         </div>
@@ -95,7 +95,7 @@ export function caseView(el, app, [id]) {
         <div class="side-block">
           <h4>Anomaly score</h4>
           <div class="score"><span class="big">${main.ifScore.toFixed(2)}</span><span class="fineprint">out of 1.00</span></div>
-          <div class="meter" aria-hidden="true"><i style="width:${(main.ifScore * 100).toFixed(1)}%"></i><u style="left:${(a.settings.ifThreshold * 100).toFixed(1)}%"></u></div>
+          <div class="meter" aria-hidden="true"><i style="background:${main.ifScore >= a.settings.ifThreshold ? "var(--pencil)" : "var(--ink-3)"};width:${(main.ifScore * 100).toFixed(1)}%"></i><u style="left:${(a.settings.ifThreshold * 100).toFixed(1)}%"></u></div>
           <p class="fineprint">Isolation Forest score. Above ${a.settings.ifThreshold.toFixed(2)} (the black mark) is flagged on its own. Ordinary bills score near 0.40.</p>
         </div>
         ${main.ifTop?.length ? `

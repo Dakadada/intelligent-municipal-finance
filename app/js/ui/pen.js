@@ -24,8 +24,8 @@ export function loopPath(w, h, seed = 1) {
   for (let i = 0; i <= steps; i++) {
     const t = start + (i / steps) * turns * Math.PI * 2;
     const wob = 1 + (rng() - 0.5) * 0.07;
-    const drift = (i / steps) * 0.08; // second pass lands slightly outside the first
-    pts.push([cx + Math.cos(t) * rx * (wob + drift), cy + Math.sin(t) * ry * (wob + drift * 0.6) - drift * h * 0.15]);
+    const drift = (i / steps) * 0.05; // second pass lands slightly outside the first
+    pts.push([cx + Math.cos(t) * rx * (wob + drift), cy + Math.sin(t) * ry * (wob + drift * 0.6) - drift * h * 0.1]);
   }
   return smooth(pts);
 }

@@ -59,6 +59,7 @@
 
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--paper); color: var(--ink);
@@ -99,7 +100,8 @@ a { color: var(--model); }
 }
 .nav a:hover { opacity: 1; background: rgba(255, 255, 255, .05); }
 .nav a[aria-current="page"] { background: rgba(255, 255, 255, .09); opacity: 1; }
-.nav a[aria-current="page"]::before { content: ""; width: 3px; align-self: stretch; margin: -2px 0 -2px -10px; border-radius: 0 2px 2px 0; background: var(--pencil); }
+.nav a { position: relative; }
+.nav a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 0 2px 2px 0; background: var(--pencil); }
 .nav a .count { font-size: 11px; font-weight: 700; background: var(--pencil); color: #fff; border-radius: 99px; padding: 0 7px; line-height: 18px; font-variant-numeric: tabular-nums; }
 .nav a .count.zero { background: rgba(255,255,255,.12); }
 .rail-foot { margin-top: auto; display: grid; gap: var(--s-3); font-size: 11.5px; line-height: 1.45; }
@@ -172,12 +174,12 @@ textarea.input { font-family: var(--f-display); font-size: 15px; line-height: 1.
 .thesis h1 { font-size: clamp(30px, 4.2vw, 52px); line-height: 1.06; max-width: 20ch; letter-spacing: -0.015em; }
 .thesis .lede { color: var(--ink-2); max-width: 64ch; font-size: 16px; }
 .circled { position: relative; white-space: nowrap; color: var(--pencil); }
-.circled > svg { position: absolute; left: -9%; top: -16%; width: 118%; height: 132%; overflow: visible; pointer-events: none; }
+.circled > svg { position: absolute; left: -3%; top: 2%; width: 106%; height: 104%; overflow: visible; pointer-events: none; }
 .facts { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-7); padding-top: var(--s-3); }
 .fact { display: grid; gap: 1px; }
 .fact b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fact span { font-size: 12px; color: var(--ink-3); }
-.fact a { color: inherit; text-decoration: none; }
+.fact a { color: inherit; text-decoration: none; display: grid; gap: 1px; }
 .fact a:hover b { text-decoration: underline; text-decoration-color: var(--rule-strong); }
 
 /* ---------- ledger rows (alert queue) ---------- */
@@ -333,6 +335,8 @@ table.t tr.open td { background: var(--sheet-2); }
 .ccard:hover { border-color: var(--ink-3); }
 .ccard[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .ccard b { font-size: 13.5px; }
+.ccard-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-2); align-items: start; }
+.ccard .grade { line-height: 1; }
 .ccard span { font-size: 12px; color: var(--ink-3); }
 .ccard .grade { font-family: var(--f-display); font-weight: 700; font-size: 20px; }
 .doc { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: var(--s-6); align-items: start; }
