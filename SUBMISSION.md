@@ -1,5 +1,7 @@
 # Congressional App Challenge 2026: Full Application (IA-03, Rep. Zachary Nunn)
 
+Team: David Shi, Srihari Kumaresan, Alex Du. The primary applicant invites the others to the team profile. At least half the team must live or go to school in IA-03.
+
 Deadline: **12:00 pm EDT, Monday, Oct 26, 2026.** Every answer below is under the
 400-word limit. Rewrite them in your own voice. Judges can ask you to explain
 anything here. Re-check the numbers against the live app before you paste

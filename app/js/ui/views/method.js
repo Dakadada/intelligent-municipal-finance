@@ -81,6 +81,6 @@ export function methodView(el, app) {
 
     <section class="section">
       <div class="section-head"><h2>Who built this</h2></div>
-      <p class="muted" style="max-width:72ch">David Shi and Srihari Kumaresan, Johnston High School, Johnston, Iowa. Built for the 2026 Congressional App Challenge. We used AI coding assistants (Anthropic's Claude and OpenAI's Codex) to help write and review parts of the code and interface. That use is disclosed in full in our submission. The idea, the Iowa research behind the rules, and the original proposal are our own.</p>
+      <p class="muted" style="max-width:72ch">David Shi, Srihari Kumaresan, and Alex Du, Johnston, Iowa. Built for the 2026 Congressional App Challenge. We used AI coding assistants (Anthropic's Claude and OpenAI's Codex) to help write and review parts of the code and interface. That use is disclosed in full in our submission. The idea, the Iowa research behind the rules, and the original proposal are our own.</p>
     </section>`;
 }

@@ -45,7 +45,9 @@ cdp.on("Page.screencastFrame", async ({ data, metadata, sessionId }) => {
   await cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
 });
 
-const wait = (ms) => page.waitForTimeout(ms);
+// Holds are stretched so the voiceover has room to breathe.
+const HOLD = 1.55;
+const wait = (ms) => page.waitForTimeout(ms * HOLD);
 let mouse = { x: 720, y: 405 };
 async function moveTo(x, y, ms = 700) {
   const steps = Math.max(8, Math.round(ms / 16));
