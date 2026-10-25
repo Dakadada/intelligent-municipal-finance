@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Red Pen · Intelligent Municipal Finance</title>
+  <meta name="description" content="Reads every line of a small city's books and marks only what needs a person. Built for Iowa towns that can't afford a full-time financial analyst.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2315212a'/%3E%3Cpath d='M14 22h36M14 32h36M14 42h36' stroke='%23a9c2ae' stroke-width='2'/%3E%3Cpath d='M12 36c2-14 34-18 40-8 5 9-14 18-30 15-9-2-11-8-6-14' fill='none' stroke='%23ff6a5c' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // Apply a saved theme before first paint so the page never flashes.
+    try { const t = localStorage.getItem("redpen.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <a class="brand" href="#/review" aria-label="Red Pen home">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="12" fill="currentColor" opacity=".08"/>
+          <path d="M14 22h36M14 32h36M14 42h36" stroke="currentColor" stroke-opacity=".35" stroke-width="2"/>
+          <path d="M12 36c2-14 34-18 40-8 5 9-14 18-30 15-9-2-11-8-6-14" fill="none" stroke="var(--pencil)" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+        <span><b>Red Pen</b><span>Intelligent Municipal Finance</span></span>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <span class="nav-label">Review</span>
+        <a href="#/review" data-route="review">Review queue <span class="count num" id="nav-count">·</span></a>
+        <a href="#/patterns" data-route="patterns">Spending patterns</a>
+        <a href="#/runway" data-route="runway">Budget runway</a>
+        <a href="#/vendors" data-route="vendors">Vendors</a>
+        <a href="#/contracts" data-route="contracts">Contracts</a>
+        <span class="nav-label" style="margin-top:14px">Setup</span>
+        <a href="#/data" data-route="data">Your data &amp; settings</a>
+        <a href="#/method" data-route="method">How it works</a>
+      </nav>
+      <div class="rail-foot">
+        <p>Advice only. Red Pen never blocks, sends, or changes a payment. People decide.</p>
+        <button class="theme-toggle" id="theme-toggle" type="button">Dark mode</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <p class="where" id="where">Loading the books…</p>
+        <div class="topbar-actions" id="topbar-actions"></div>
+      </header>
+      <main class="view" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div class="reader" id="reader" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
