@@ -1,14 +1,16 @@
 // Budget runway: a seasonal ARIMA forecast of the rest of the fiscal year,
 // compared with the budget the council adopted.
 
-import { esc, money, moneyShort, month } from "../format.js";
+import { esc, money, moneyShort, month, monthsBetween, MIN_HISTORY_MONTHS } from "../format.js";
 import { runwayChart } from "../charts.js";
 import { catRow } from "./review.js";
 
 export function runwayView(el, app) {
   const fc = app.analysis.forecast;
-  if (!fc || !fc.total) {
-    el.innerHTML = `<div class="empty"><span class="pen">No forecast yet.</span><span>Forecasting needs at least two full years of monthly spending.</span></div>`;
+  const s = app.analysis.summary;
+  const history = monthsBetween(s.firstDate, app.analysis.asOf);
+  if (!fc || !fc.total || history < MIN_HISTORY_MONTHS) {
+    el.innerHTML = `<div class="empty"><span class="pen">No forecast yet.</span><span>Forecasting needs at least two full years of monthly spending to learn the seasons. This file covers ${history} month${history === 1 ? "" : "s"}.</span></div>`;
     return;
   }
   const t = fc.total;

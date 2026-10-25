@@ -1,7 +1,7 @@
 // Review queue: the clerk's morning view. One sentence says how much was
 // read and how much needs a person; the queue below is sorted by risk.
 
-import { esc, money, money2, moneyShort, count, date, month, plural } from "../format.js";
+import { esc, money, money2, moneyShort, count, date, month, plural, monthsBetween, MIN_HISTORY_MONTHS } from "../format.js";
 import { circleSvg, tallySvg, TICKS } from "../pen.js";
 import { runwayChart } from "../charts.js";
 import { store } from "../store.js";
@@ -21,7 +21,7 @@ export function reviewView(el, app) {
       <span class="eyebrow">Review queue · ${date(s.firstDate)} to ${date(s.lastDate)}</span>
       <h1>${count(s.txnCount)} transactions read. ${open.length
         ? `<span class="circled">${count(open.length)} need you.${circleSvg({ seed: open.length, delay: 0.35 })}</span>`
-        : `<span style="color:var(--ok)">All reviewed.</span>`}</h1>
+        : `<span style="color:var(--ok)">${a.alerts.length ? "All reviewed." : "Nothing needs you."}</span>`}</h1>
       <p class="lede">A traditional audit samples a small share of transactions every year or two. Red Pen checked every one of them${years > 1 ? ` across ${years} fiscal years` : ""} using four models and a set of rules drawn from Iowa State Auditor findings. Each flag below explains itself in plain English.</p>
       <div class="facts">
         <div class="fact"><b>${moneyShort(s.totalSpend).replace(/^\$(\d)M$/, "$$$1.0M")}</b><span>spending checked</span></div>
@@ -70,9 +70,9 @@ export function reviewView(el, app) {
     const box = el.querySelector("#queue");
     if (!list.length) {
       box.innerHTML = `<div class="ledger"><div class="empty">
-        <span class="pen">${filter.show === "open" && !q && filter.type === "all" ? "Nothing left to review." : "No findings match."}</span>
-        <span>${filter.show === "open" && !q ? "Every finding has a decision. They're all in the audit log." : "Try a different search or show all findings."}</span>
-        ${filter.show !== "all" ? `<button class="btn sm" type="button" data-show="all">Show all findings</button>` : ""}
+        <span class="pen">${!a.alerts.length ? "Nothing worth a second look." : filter.show === "open" && !q && filter.type === "all" ? "Nothing left to review." : "No findings match."}</span>
+        <span>${!a.alerts.length ? "Every transaction in this file passed every check." : filter.show === "open" && !q ? "Every finding has a decision. They're all in the audit log." : "Try a different search or show all findings."}</span>
+        ${filter.show !== "all" && a.alerts.length ? `<button class="btn sm" type="button" data-show="all">Show all findings</button>` : ""}
       </div></div>`;
       return;
     }
@@ -120,7 +120,8 @@ function row(x, decision) {
 
 function renderRunwaySide(box, app) {
   const fc = app.analysis.forecast;
-  if (!fc || !fc.total) { box.innerHTML = ""; return; }
+  const history = monthsBetween(app.analysis.summary.firstDate, app.analysis.asOf);
+  if (!fc || !fc.total || history < MIN_HISTORY_MONTHS) { box.innerHTML = ""; return; }
   const cats = [...fc.categories].filter((c) => c.budget).sort((p, q) => q.pctOfBudget - p.pctOfBudget);
   const worst = cats.find((c) => c.status === "over");
   const over = cats.filter((c) => c.status === "over");

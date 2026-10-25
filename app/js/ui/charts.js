@@ -241,7 +241,10 @@ export function vendorStrip(el, txns, focusIds = [], { normal } = {}) {
     const cx = xs[i];
     const cy = y(t.amount);
     if (!on) return `<circle cx="${f(cx)}" cy="${f(cy)}" r="3.6" fill="var(--ink-3)" opacity=".75"/>`;
-    return `<circle cx="${f(cx)}" cy="${f(cy)}" r="5.5" fill="var(--pencil)" stroke="var(--sheet)" stroke-width="2"/>${chartLoop(cx, cy, 13, i + 5, 0.45 + 0.2 * k++)}`;
+    // Circle at most three invoices; more loops than that turn into a scribble.
+    const loop = k < 3 ? chartLoop(cx, cy, 13, i + 5, 0.45 + 0.2 * k) : "";
+    k++;
+    return `<circle cx="${f(cx)}" cy="${f(cy)}" r="5.5" fill="var(--pencil)" stroke="var(--sheet)" stroke-width="2"/>${loop}`;
   });
   const y0 = new Date(t0).getUTCFullYear();
   const y1 = new Date(t1).getUTCFullYear();

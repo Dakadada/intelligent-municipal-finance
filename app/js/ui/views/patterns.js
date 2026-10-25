@@ -1,14 +1,14 @@
 // Spending patterns: what each category normally costs in each month,
 // learned by gradient-boosted trees, with the months that broke the pattern.
 
-import { esc, money, moneyShort, month } from "../format.js";
+import { esc, money, moneyShort, month, MIN_HISTORY_MONTHS } from "../format.js";
 import { patternChart } from "../charts.js";
 
 export function patternsView(el, app, [catId]) {
   const a = app.analysis;
-  const cats = a.categories.filter((c) => a.patterns[c.id]);
+  const cats = a.categories.filter((c) => a.patterns[c.id] && a.patterns[c.id].months.length >= MIN_HISTORY_MONTHS);
   const flaggedCount = (id) => a.patterns[id].months.filter((m) => m.flagged).length;
-  const current = a.patterns[catId] ? catId : (cats.find((c) => flaggedCount(c.id)) ?? cats[0])?.id;
+  const current = cats.some((c) => c.id === catId) ? catId : (cats.find((c) => flaggedCount(c.id)) ?? cats[0])?.id;
   if (!current) {
     el.innerHTML = `<div class="empty"><span class="pen">Not enough history yet.</span><span>Spending patterns need at least two years of monthly data per category.</span></div>`;
     return;

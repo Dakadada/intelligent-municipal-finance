@@ -60,3 +60,12 @@ export function timestamp(ms) {
 }
 
 export const plural = (n, word, many = `${word}s`) => `${count(n)} ${n === 1 ? word : many}`;
+
+// Whole months between two ISO dates, used to decide whether there is
+// enough history for seasonal models (they need two full years).
+export function monthsBetween(fromIso, toIso) {
+  const [y1, m1] = fromIso.split("-").map(Number);
+  const [y2, m2] = toIso.split("-").map(Number);
+  return (y2 - y1) * 12 + (m2 - m1) + 1;
+}
+export const MIN_HISTORY_MONTHS = 24;
