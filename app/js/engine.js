@@ -88,42 +88,77 @@ function buildVendors(transactions, groups, months, asOf) {
     .sort((firstEntry, secondEntry) => secondEntry.total - firstEntry.total);
 }
 const severityRank = { critical: 0, high: 1, medium: 2 };
-function mergeAlerts(candidates) {
+function compareAlerts(first, second) {
+  return severityRank[first.severity] - severityRank[second.severity] ||
+    second.score - first.score;
+}
+
+function addEvidence(target, source) {
+  if (severityRank[source.severity] < severityRank[target.severity]) {
+    target.severity = source.severity;
+  }
+  target.score = Math.max(target.score, source.score);
+  target.detectors = [...new Set([...target.detectors, ...source.detectors])];
+  target.reasons = [...new Set([
+    target.reasons[0], source.reasons[0], ...target.reasons, ...source.reasons,
+  ])].slice(0, 4);
+}
+
+function mergeSamePayments(candidates) {
   const merged = [];
-  for (const candidate of candidates.sort(
-    (firstEntry, secondEntry) =>
-      severityRank[firstEntry.severity] - severityRank[secondEntry.severity] ||
-      secondEntry.score - firstEntry.score,
-  )) {
+  for (const candidate of candidates.sort(compareAlerts)) {
     const ids = new Set(candidate.txnIds);
-    const overlap = merged.filter((firstEntry) => firstEntry.txnIds.some((id) => ids.has(id)));
-    if (!overlap.length) {
-      merged.push({ ...candidate });
+    const samePayments = merged.find(alert => ids.size > 0 &&
+      alert.txnIds.length === ids.size && alert.txnIds.every(id => ids.has(id)));
+    if (samePayments) addEvidence(samePayments, candidate);
+    else merged.push({ ...candidate, reasons: [...candidate.reasons] });
+  }
+  return merged;
+}
+
+function mergeVendorPricing(alerts) {
+  const pricingByVendor = new Map();
+  const combined = [];
+  for (const alert of alerts) {
+    const isPricing = alert.type === "above-similar" || alert.type === "vendor-increase";
+    if (!isPricing) {
+      combined.push(alert);
       continue;
     }
-    const keep = overlap[0];
-    const all = [keep, ...overlap.slice(1), candidate];
-    keep.txnIds = [...new Set(all.flatMap((firstEntry) => firstEntry.txnIds))];
-    keep.detectors = [...new Set(all.flatMap((firstEntry) => firstEntry.detectors))];
-    keep.reasons = [...new Set(all.flatMap((firstEntry) => firstEntry.reasons))];
-    // Keep at most four readable evidence statements, with each detector's
-    // first explanation preferred to repeated details from the same rule.
-    keep.reasons = [
-      ...new Set(all.map((firstEntry) => firstEntry.reasons[0]).concat(keep.reasons)),
-    ].slice(0, 4);
-    keep.score = Math.max(...all.map((firstEntry) => firstEntry.score));
-    for (const drop of overlap.slice(1)) {
-      merged.splice(merged.indexOf(drop), 1);
+    const existing = pricingByVendor.get(alert.vendor);
+    if (!existing) {
+      pricingByVendor.set(alert.vendor, alert);
+      combined.push(alert);
+      continue;
     }
+    // Combine only independently flagged pricing evidence for this supplier.
+    // Monthly spending context is handled separately and cannot add payments.
+    existing.txnIds = [...new Set([...existing.txnIds, ...alert.txnIds])];
+    existing.amount = Math.max(existing.amount, alert.amount);
+    addEvidence(existing, alert);
   }
-  return merged
-    .sort(
-      (firstEntry, secondEntry) =>
-        severityRank[firstEntry.severity] - severityRank[secondEntry.severity] ||
-        secondEntry.score - firstEntry.score,
-    )
-    .map((firstEntry, i) => ({ ...firstEntry, id: `A${String(i + 1).padStart(3, "0")}` }));
+  return combined;
 }
+
+function mergeAlerts(candidates) {
+  const transactionFindings = candidates.filter(alert => alert.type !== "seasonal");
+  const merged = mergeSamePayments(mergeVendorPricing(mergeSamePayments(transactionFindings)));
+  const seasonalFindings = candidates.filter(alert => alert.type === "seasonal");
+  for (const seasonal of seasonalFindings.sort(compareAlerts)) {
+    const monthIds = new Set(seasonal.txnIds);
+    const overlapping = merged.filter(alert => alert.txnIds.some(id => monthIds.has(id)));
+    if (!overlapping.length) {
+      merged.push({ ...seasonal });
+      continue;
+    }
+    // A month's total describes context, not guilt for every invoice that month.
+    for (const alert of overlapping) addEvidence(alert, seasonal);
+  }
+  return merged.sort(compareAlerts).map((alert, i) => ({
+    ...alert, id: `A${String(i + 1).padStart(3, "0")}`,
+  }));
+}
+
 function evaluate(transactions, alerts) {
   // This is the only analysis function allowed to inspect demonstration labels.
   const labeled = transactions.filter((transaction) => transaction.planted);
@@ -179,7 +214,6 @@ function buildCategories(transactions) {
   );
   return categories;
 }
-
 function attachAlertReferences(transactions, vendors, alerts, patterns) {
   const txnMap = new Map(transactions.map((transaction) => [transaction.id, transaction]));
   for (const firstEntry of alerts) {
@@ -211,7 +245,6 @@ function attachAlertReferences(transactions, vendors, alerts, patterns) {
     }
   }
 }
-
 function buildSummary(transactions, alerts, vendors, lookup, asOf, ledger) {
   const fyTotals = new Map();
   for (const transaction of transactions) {
@@ -240,7 +273,6 @@ function buildSummary(transactions, alerts, vendors, lookup, asOf, ledger) {
   };
   return summary;
 }
-
 export function runAnalysis(ledger, settings = DEFAULT_SETTINGS) {
   settings = { ...DEFAULT_SETTINGS, ...settings };
   const asOf = ledger.town.asOf;

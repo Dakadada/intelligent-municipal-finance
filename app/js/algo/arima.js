@@ -1,44 +1,47 @@
 // Forecast seasonal spending by subtracting the same month a year earlier.
 // Ordinary least squares fits drift and two recent changes. Seeded simulated
 // errors give an 80% range, useful when a small city's future costs are uncertain.
-import { ols, mean, stdev, quantile, sum } from "./stats.js";
+import { ols, mean, median, mad, stdev, quantile, sum } from "./stats.js";
 import { makeRng } from "./rng.js";
 import { dollars, monthName } from "./rules.js";
+function winsorizeSeasons(inputValues) {
+  return inputValues.map((value, i) => {
+    const sameMonth = inputValues.filter((unusedValue, j) => j % 12 === i % 12);
+    const typical = median(sameMonth);
+    const allowance = Math.max(3 * mad(sameMonth), typical * 0.2, 25);
+    return Math.max(typical - allowance, Math.min(typical + allowance, value));
+  });
+}
+
 export function fitARIMA(inputValues) {
-  const values = [...inputValues];
+  // A one-time project should not repeat every year in the forecast. Bound
+  // extreme observations using other years of the SAME calendar month.
+  const values = winsorizeSeasons(inputValues);
   const differences = values.slice(12).map((amount, i) => amount - values[i]);
   const regressionRows = [];
-  const target = [];
+  const targets = [];
   for (let i = 2; i < differences.length; i++) {
     regressionRows.push([1, differences[i - 1], differences[i - 2]]);
-    target.push(differences[i]);
+    targets.push(differences[i]);
   }
-  let coefficients =
-    regressionRows.length >= 6 ? ols(regressionRows, target) : [mean(differences), 0, 0];
-  // Constrain explosive AR fits: sparse city ledgers can otherwise diverge.
+  let coefficients = [mean(differences), 0, 0];
+  if (regressionRows.length >= 6) coefficients = ols(regressionRows, targets);
+
+  // Shrink noisy lag relationships rather than propagating them as certainty.
+  // FY2026 holdout testing selected 25% of the stabilized OLS coefficients.
   const norm = Math.abs(coefficients[1]) + Math.abs(coefficients[2]);
-  if (norm > 0.98) {
-    const lagOneCoefficient = (coefficients[1] * 0.98) / norm;
-    const lagTwoCoefficient = (coefficients[2] * 0.98) / norm;
-    coefficients = [
-      mean(differences) * (1 - lagOneCoefficient - lagTwoCoefficient),
-      lagOneCoefficient,
-      lagTwoCoefficient,
-    ];
-  }
-  const residuals = target.map(
-    (amount, i) =>
-      amount -
-      regressionRows[i].reduce((runningTotal, x, j) => runningTotal + x * coefficients[j], 0),
-  );
+  const stabilityScale = norm > 0.98 ? 0.98 / norm : 1;
+  const firstLag = coefficients[1] * stabilityScale * 0.25;
+  const secondLag = coefficients[2] * stabilityScale * 0.25;
+  const annualChange = mean(differences);
+  coefficients = [annualChange * (1 - firstLag - secondLag), firstLag, secondLag];
+  const residuals = targets.map((amount, i) => amount - regressionRows[i].reduce(
+    (total, feature, j) => total + feature * coefficients[j], 0));
   return {
-    y: values,
-    differences,
-    coefficients,
-    sigma: stdev(residuals),
-    fallback: mean(values),
+    y: values, differences, coefficients, sigma: stdev(residuals), fallback: mean(values),
   };
 }
+
 export function forecastARIMA(model, horizon, { paths = 400, seed = 2027 } = {}) {
   const random = makeRng(seed);
   const simulations = [];
@@ -92,25 +95,33 @@ const span = (first, last) => {
   }
   return result;
 };
-function forecastStatus(budget, projected, projectedHi) {
-  if (budget === null) return "ok";
-  if (projected > budget) return "over";
-  if (projectedHi > budget) return "watch";
+export function forecastStatus(budget, projected, projectedLo, projectedHi) {
+  if (budget === null) {
+    return "ok";
+  }
+  if (projected > budget * 1.05 || projectedLo > budget) {
+    return "over";
+  }
+  if (projected > budget || projectedHi > budget) {
+    return "watch";
+  }
   return "ok";
 }
-
 function findOverrunMonth(months, budget) {
-  if (budget === null) return null;
+  if (budget === null) {
+    return null;
+  }
   return months.find((monthEntry) => monthEntry.cumForecast > budget)?.month ?? null;
 }
-
 function forecastHeadline(budget, projected, projectedHi, status, overrunMonth) {
   if (budget === null) {
     return `Projected annual spending is ${dollars(projected)}; no budget was supplied.`;
   }
   if (status === "over") {
     let percent = "unbudgeted";
-    if (budget) percent = Math.round((projected / budget - 1) * 100);
+    if (budget) {
+      percent = Math.round((projected / budget - 1) * 100);
+    }
     return (
       `Projected to exceed the ${dollars(budget)} budget by ` +
       `${dollars(projected - budget)} (${percent}%) by ${monthName(overrunMonth)}.`
@@ -124,7 +135,6 @@ function forecastHeadline(budget, projected, projectedHi, status, overrunMonth) 
   }
   return `Projected spending of ${dollars(projected)} is within the ${dollars(budget)} budget.`;
 }
-
 function cumulativePath(simulatedPath) {
   let runningTotal = 0;
   return simulatedPath.map((amount) => {
@@ -132,7 +142,6 @@ function cumulativePath(simulatedPath) {
     return runningTotal;
   });
 }
-
 function forecastCategory(
   ledger,
   category,
@@ -186,7 +195,7 @@ function forecastCategory(
   const projected = end.cumForecast;
   const projectedLo = end.cumLo;
   const projectedHi = end.cumHi;
-  const status = forecastStatus(budget, projected, projectedHi);
+  const status = forecastStatus(budget, projected, projectedLo, projectedHi);
   const overrunMonth = findOverrunMonth(months, budget);
   const headline = forecastHeadline(budget, projected, projectedHi, status, overrunMonth);
   return {
@@ -205,28 +214,7 @@ function forecastCategory(
     paths,
   };
 }
-
-export function buildForecast(ledger, categories, asOf) {
-  const start = ledger.town.fyStartMonth ?? 7;
-  const fy = fiscalYear(asOf, start);
-  const first = `${fy - (start === 1 ? 0 : 1)}-${String(start).padStart(2, "0")}`;
-  const fiscalMonths = Array.from({ length: 12 }, (unusedValue, i) => monthAt(first, i));
-  const observed = fiscalMonths.filter((monthEntry) => monthEntry <= month(asOf)).length;
-  const horizon = 12 - observed;
-  const allMonths = ledger.txns.length ? span(month(ledger.txns[0].date), month(asOf)) : [];
-  const details = categories.map((category, index) =>
-    forecastCategory(
-      ledger,
-      category,
-      index,
-      asOf,
-      allMonths,
-      fiscalMonths,
-      observed,
-      horizon,
-      fy,
-    ),
-  );
+function combineCategoryPaths(details, fiscalMonths, observed) {
   // Sum corresponding independent simulation paths, then take quantiles.
   // Summing marginal interval endpoints would exaggerate citywide uncertainty.
   const months = fiscalMonths.map((monthEntry, i) => {
@@ -257,6 +245,30 @@ export function buildForecast(ledger, categories, asOf) {
       cumHi: quantile(cumulative, 0.9),
     };
   });
+  return months;
+}
+export function buildForecast(ledger, categories, asOf) {
+  const start = ledger.town.fyStartMonth ?? 7;
+  const fy = fiscalYear(asOf, start);
+  const first = `${fy - (start === 1 ? 0 : 1)}-${String(start).padStart(2, "0")}`;
+  const fiscalMonths = Array.from({ length: 12 }, (unusedValue, i) => monthAt(first, i));
+  const observed = fiscalMonths.filter((monthEntry) => monthEntry <= month(asOf)).length;
+  const horizon = 12 - observed;
+  const allMonths = ledger.txns.length ? span(month(ledger.txns[0].date), month(asOf)) : [];
+  const details = categories.map((category, index) =>
+    forecastCategory(
+      ledger,
+      category,
+      index,
+      asOf,
+      allMonths,
+      fiscalMonths,
+      observed,
+      horizon,
+      fy,
+    ),
+  );
+  const months = combineCategoryPaths(details, fiscalMonths, observed);
   const budget =
     details.length && details.every((categoryDetail) => categoryDetail.budget !== null)
       ? sum(details.map((categoryDetail) => categoryDetail.budget))

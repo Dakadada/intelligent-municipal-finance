@@ -9,7 +9,6 @@ export const CSV_TEMPLATE = [
     "Facilities,2027,12000",
   "2026-07-10,Example Supply,125.50,Office Supplies,S-001,Paper," + "Administration,2027,3000",
 ].join("\n");
-
 function readCsvRows(text) {
   const rows = [];
   let row = [];
@@ -47,7 +46,6 @@ function readCsvRows(text) {
   }
   return { rows, quoted };
 }
-
 function emptyImportedLedger() {
   return {
     town: {
@@ -62,7 +60,6 @@ function emptyImportedLedger() {
     budgets: {},
   };
 }
-
 function importBudget(record, i, ledger, categoryId, warnings) {
   if (record.budget || record.budget_fy) {
     const budget = Number(record.budget.replace(/[$,]/g, ""));
@@ -88,7 +85,6 @@ function importBudget(record, i, ledger, categoryId, warnings) {
     }
   }
 }
-
 function importPayment(record, i, ledger, warnings) {
   const date = new Date(`${record.date}T00:00:00Z`);
   const amount = Number(record.amount.replace(/[$,]/g, ""));
@@ -126,7 +122,6 @@ function importPayment(record, i, ledger, warnings) {
   });
   importBudget(record, i, ledger, categoryId, warnings);
 }
-
 export function parseLedgerCSV(text) {
   const { rows, quoted } = readCsvRows(text);
   const warnings = [];

@@ -10,11 +10,13 @@ export function normalize(name) {
     .replace(/\s+/g, " ")
     .trim();
 }
-
 export function jaroWinkler(firstName, secondName) {
-  if (firstName === secondName) return 1;
-  if (!firstName.length || !secondName.length) return 0;
-
+  if (firstName === secondName) {
+    return 1;
+  }
+  if (!firstName.length || !secondName.length) {
+    return 0;
+  }
   const radius = Math.max(
     0,
     Math.floor(Math.max(firstName.length, secondName.length) / 2) - 1,
@@ -22,7 +24,6 @@ export function jaroWinkler(firstName, secondName) {
   const firstMatches = new Array(firstName.length).fill(false);
   const secondMatches = new Array(secondName.length).fill(false);
   let matches = 0;
-
   // A letter can match only once, and only within the search window.
   for (let i = 0; i < firstName.length; i++) {
     const firstPosition = Math.max(0, i - radius);
@@ -36,8 +37,9 @@ export function jaroWinkler(firstName, secondName) {
       }
     }
   }
-  if (!matches) return 0;
-
+  if (!matches) {
+    return 0;
+  }
   const firstLetters = [...firstName].filter((letter, i) => firstMatches[i]);
   const secondLetters = [...secondName].filter((letter, i) => secondMatches[i]);
   const transpositions =
@@ -47,7 +49,6 @@ export function jaroWinkler(firstName, secondName) {
       matches / secondName.length +
       (matches - transpositions) / matches) /
     3;
-
   let prefixLength = 0;
   while (
     prefixLength < Math.min(4, firstName.length, secondName.length) &&
@@ -55,10 +56,11 @@ export function jaroWinkler(firstName, secondName) {
   ) {
     prefixLength++;
   }
-  if (jaro > 0.7) return jaro + prefixLength * 0.1 * (1 - jaro);
+  if (jaro > 0.7) {
+    return jaro + prefixLength * 0.1 * (1 - jaro);
+  }
   return jaro;
 }
-
 export function clusterVendors(names, threshold = 0.93) {
   const groups = [];
   const uniqueNames = [...new Set(names)].sort();
@@ -73,7 +75,7 @@ export function clusterVendors(names, threshold = 0.93) {
       continue;
     }
     const similarities = group.aliases.map((alias) =>
-      jaroWinkler(normalize(alias), normalize(name)),
+      jaroWinkler(alias.toLowerCase(), name.toLowerCase()),
     );
     group.similarity = Math.min(group.similarity, ...similarities);
     group.aliases.push(name);

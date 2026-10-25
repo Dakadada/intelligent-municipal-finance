@@ -18,7 +18,7 @@ export function monthName(value) {
 }
 function paymentDate(value) {
   return new Date(value + "T00:00:00Z").toLocaleDateString("en-US", {
-    month: "long",
+    month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
@@ -160,21 +160,15 @@ function detectSplits({ rows, vendor, settings, add }) {
   const pieces = group.map((payment) => dollars(payment.amount)).join(" + ");
   const headline =
     `${vendor.canonical} was paid ${pieces} within 3 days` +
-    (" (total " +
-      `${dollars(total)}` +
-      "), each just under the " +
-      `${dollars(threshold)}` +
-      " approval limit.");
+    ` (total ${dollars(total)}), each just under the ${dollars(threshold)} approval limit.`;
   add(
     "split",
     group,
     headline,
     [
       `The vendor's typical below-threshold invoice is ${dollars(typicalSmallInvoice)}.`,
-      "" +
-        `${group.length}` +
-        " invoices describe the same work; check whether they are one " +
-        "purchase.",
+      `${group.length} invoices describe the same work; ` +
+        "check whether they are one purchase.",
     ],
     { amount: total, severity: "critical", score: 0.98 },
   );
@@ -202,16 +196,25 @@ function detectNewVendor({ rows, vendor, settings, add, ledgerFirstDate }) {
     { score: 0.91 },
   );
 }
-function detectAboveSimilar({ rows, vendor, settings, add }) {
-  const monthMedians = Array.from({ length: 12 }, (_, monthEntry) =>
+function hasSeasonalInvoices(rows) {
+  const monthMedians = Array.from({ length: 12 }, (unusedValue, monthIndex) =>
     median(
       rows
-        .filter((transaction) => +transaction.date.slice(5, 7) === monthEntry + 1)
+        .filter((transaction) => +transaction.date.slice(5, 7) === monthIndex + 1)
         .map((transaction) => transaction.amount),
     ),
   ).filter((amount) => amount > 0);
-  const seasonal =
-    monthMedians.length >= 9 && Math.max(...monthMedians) > 2 * Math.min(...monthMedians);
+  return monthMedians.length >= 9 && Math.max(...monthMedians) > 2 * Math.min(...monthMedians);
+}
+function similarPaymentHeadline(transaction, vendor, increasePercent, peers, average) {
+  return (
+    `This ${dollars(transaction.amount)} payment to ${vendor.canonical} is ` +
+    `${Math.round(increasePercent)}% above ${peers.length} comparable prior invoices ` +
+    `averaging ${dollars(average)}.`
+  );
+}
+function detectAboveSimilar({ rows, vendor, settings, add }) {
+  const seasonal = hasSeasonalInvoices(rows);
   for (const transaction of rows) {
     const prior = rows.filter(
       (priorPayment) =>
@@ -260,119 +263,98 @@ function detectAboveSimilar({ rows, vendor, settings, add }) {
       add(
         "above-similar",
         [transaction],
-        "This " +
-          `${dollars(transaction.amount)}` +
-          " payment to " +
-          `${vendor.canonical}` +
-          " is " +
-          `${Math.round(increasePercent)}` +
-          "% above " +
-          `${peers.length}` +
-          " comparable prior invoices averaging " +
-          `${dollars(average)}` +
-          ".",
+        similarPaymentHeadline(transaction, vendor, increasePercent, peers, average),
         [
           `Comparable invoices are from the preceding 36 months in ${transaction.category}.`,
-          "The difference from the comparison average is " +
-            `${dollars(transaction.amount - average)}` +
-            ".",
+          `The difference from the comparison average is ` +
+            `${dollars(transaction.amount - average)}.`,
         ],
         { score: Math.min(0.97, 0.73 + increasePercent / 1000) },
       );
     }
   }
 }
-function detectVendorIncrease({ rows, vendor, settings, add }) {
-  if (
-    vendor.changePct > settings.vendorIncreasePct &&
-    vendor.recentAvg > vendor.priorAvg + 75
-  ) {
-    const recent = rows.filter((transaction) => transaction.date >= vendor.recentCutoff);
-    add(
-      "vendor-increase",
-      recent,
-      "" +
-        `${vendor.canonical}` +
-        "'s average invoice rose " +
-        `${Math.round(vendor.changePct)}` +
-        "%, from " +
-        `${dollars(vendor.priorAvg)}` +
-        " to " +
-        `${dollars(vendor.recentAvg)}` +
-        " in the latest 12 months.",
-      [
-        `Comparison uses the preceding 12 months as the baseline.`,
-        "At the recent invoice count, the annual increase is approximately " +
-          `${dollars((vendor.recentAvg - vendor.priorAvg) * recent.length)}` +
-          ".",
-      ],
-      {
-        txnIds: [],
-        detectors: ["vendor-trend"],
-        score: Math.min(0.95, 0.75 + vendor.changePct / 500),
-        amount: (vendor.recentAvg - vendor.priorAvg) * recent.length,
-      },
-    );
-  } else {
-    if (vendor.monthly?.length >= 24) {
-      // Stable invoice sizes can hide higher costs when bills are divided into
-      // more installments. Compare matched calendar months, not raw seasons.
-      const recentMonths = vendor.monthly.slice(-12);
-      const priorMonths = vendor.monthly.slice(-24, -12);
-      const recentTotal = recentMonths.reduce(
-        (subtotal, monthEntry) => subtotal + monthEntry.total,
-        0,
-      );
-      const priorTotal = priorMonths.reduce(
-        (subtotal, monthEntry) => subtotal + monthEntry.total,
-        0,
-      );
-      const increase = priorTotal > 0 ? (recentTotal / priorTotal - 1) * 100 : 0;
-      const higherMonths = recentMonths.filter(
-        (monthEntry, i) =>
-          priorMonths[i].total > 0 &&
-          monthEntry.total > priorMonths[i].total * (1 + settings.vendorIncreasePct / 100),
-      ).length;
-      if (
-        increase > settings.vendorIncreasePct &&
-        higherMonths >= 7 &&
-        recentTotal - priorTotal >= 750
-      ) {
-        const recent = rows.filter((transaction) => transaction.date >= vendor.recentCutoff);
-        add(
-          "vendor-increase",
-          recent,
-          "" +
-            `${vendor.canonical}` +
-            "'s monthly spending rose " +
-            `${Math.round(increase)}` +
-            "%, from " +
-            `${dollars(priorTotal / 12)}` +
-            " to " +
-            `${dollars(recentTotal / 12)}` +
-            " on average in the latest 12 months.",
-          [
-            "" +
-              `${higherMonths}` +
-              " of 12 months exceed the matching month a year earlier by more " +
-              "than " +
-              `${settings.vendorIncreasePct}` +
-              "%.",
-            "Annual spending increased by " +
-              `${dollars(recentTotal - priorTotal)}` +
-              "; verify quantities and unit prices before attributing the " +
-              "increase to a rate change.",
-          ],
-          {
-            txnIds: [],
-            detectors: ["vendor-trend"],
-            score: Math.min(0.95, 0.75 + increase / 500),
-            amount: recentTotal - priorTotal,
-          },
-        );
-      }
-    }
+function detectMonthlyVendorIncrease({ rows, vendor, settings, add }) {
+  if (!(vendor.monthly?.length >= 24)) {
+    return;
   }
+  // More installments can conceal rising costs even when invoice sizes are flat.
+  // Match calendar months so winter costs are compared with other winter costs.
+  const recentMonths = vendor.monthly.slice(-12);
+  const priorMonths = vendor.monthly.slice(-24, -12);
+  const recentTotal = recentMonths.reduce((total, monthEntry) => total + monthEntry.total, 0);
+  const priorTotal = priorMonths.reduce((total, monthEntry) => total + monthEntry.total, 0);
+  const increase = priorTotal > 0 ? (recentTotal / priorTotal - 1) * 100 : 0;
+  const higherMonths = recentMonths.filter(
+    (monthEntry, i) =>
+      priorMonths[i].total > 0 &&
+      monthEntry.total > priorMonths[i].total * (1 + settings.vendorIncreasePct / 100),
+  ).length;
+  if (!(
+    increase > settings.vendorIncreasePct &&
+    higherMonths >= 7 &&
+    recentTotal - priorTotal >= 750
+  )) {
+    return;
+  }
+  const elevatedMonths = new Set(recentMonths.filter((monthEntry, i) =>
+    priorMonths[i].total > 0 &&
+    monthEntry.total > priorMonths[i].total * (1 + settings.vendorIncreasePct / 100)
+  ).map(monthEntry => monthEntry.month));
+  const recent = rows.filter(transaction => transaction.date >= vendor.recentCutoff &&
+    elevatedMonths.has(transaction.date.slice(0, 7)));
+  const headline =
+    `${vendor.canonical}'s monthly spending rose ${Math.round(increase)}%, ` +
+    `from ${dollars(priorTotal / 12)} to ${dollars(recentTotal / 12)} ` +
+    "on average in the latest 12 months.";
+  add(
+    "vendor-increase",
+    recent,
+    headline,
+    [
+      `${higherMonths} of 12 months exceed the matching month a year earlier ` +
+        `by more than ${settings.vendorIncreasePct}%.`,
+      `Annual spending increased by ${dollars(recentTotal - priorTotal)}; ` +
+        "verify quantities and unit prices before attributing the increase to a rate change.",
+    ],
+    {
+      txnIds: recent.map(transaction => transaction.id),
+      detectors: ["vendor-trend"],
+      score: Math.min(0.95, 0.75 + increase / 500),
+      amount: recentTotal - priorTotal,
+    },
+  );
+}
+function detectVendorIncrease(context) {
+  const { rows, vendor, settings, add } = context;
+  const invoicePriceIncreased =
+    vendor.changePct > settings.vendorIncreasePct && vendor.recentAvg > vendor.priorAvg + 75;
+  if (!invoicePriceIncreased) {
+    detectMonthlyVendorIncrease(context);
+    return;
+  }
+  const recent = rows.filter((transaction) => transaction.date >= vendor.recentCutoff);
+  const annualIncrease = (vendor.recentAvg - vendor.priorAvg) * recent.length;
+  const headline =
+    `${vendor.canonical}'s average invoice rose ` +
+    `${Math.round(vendor.changePct)}%, from ${dollars(vendor.priorAvg)} ` +
+    `to ${dollars(vendor.recentAvg)} in the latest 12 months.`;
+  add(
+    "vendor-increase",
+    recent,
+    headline,
+    [
+      "Comparison uses the preceding 12 months as the baseline.",
+      `At the recent invoice count, the annual increase is approximately ` +
+        `${dollars(annualIncrease)}.`,
+    ],
+    {
+      txnIds: [],
+      detectors: ["vendor-trend"],
+      score: Math.min(0.95, 0.75 + vendor.changePct / 500),
+      amount: annualIncrease,
+    },
+  );
 }
 export function detectRules(transactions, vendors, settings) {
   const alerts = [];

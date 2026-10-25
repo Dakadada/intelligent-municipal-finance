@@ -1,0 +1,12 @@
+{
+  "name": "red-pen-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hook": "node render-hook.mjs",
+    "demo": "node render-demo.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.50.0"
+  }
+}

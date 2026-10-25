@@ -144,7 +144,6 @@ const CLAUSE_RULES = [
     "The city can inspect records that support charges.",
   ],
 ];
-
 function splitSentences(text) {
   const sentences = [];
   // Decimal points within prices and percentages are not sentence boundaries.
@@ -164,7 +163,6 @@ function splitSentences(text) {
   }
   return sentences;
 }
-
 function extractTerms(text) {
   const hasPriceCap =
     /(?:capped at|cap (?:is|of)|increases? (?:shall not|may not) exceed)/i.test(text);
@@ -205,7 +203,6 @@ function extractTerms(text) {
   }
   return { terms, hasPriceCap, hasSpendingLimit, hasCompetitiveBid };
 }
-
 function findClauseMatches(sentences, context) {
   const { terms, hasPriceCap, hasSpendingLimit, hasCompetitiveBid } = context;
   const findings = [];
@@ -251,12 +248,16 @@ function findClauseMatches(sentences, context) {
   }
   return findings;
 }
-
 function suitabilityScore(findings, sentences) {
   let score = 100;
   for (const finding of findings) {
-    if (finding.severity === "high") score -= 20;
-    else if (finding.severity === "medium") score -= 10;
+    if (finding.severity === "high") {
+      score -= 20;
+    } else {
+      if (finding.severity === "medium") {
+        score -= 10;
+      }
+    }
   }
   // Classifier contributes modestly; auditable rules dominate the suitability score.
   if (sentences.length) {
@@ -272,15 +273,21 @@ function suitabilityScore(findings, sentences) {
   score = Math.max(0, Math.min(100, score));
   return score;
 }
-
 function suitabilityGrade(score) {
-  if (score >= 90) return "A";
-  if (score >= 80) return "B";
-  if (score >= 70) return "C";
-  if (score >= 60) return "D";
+  if (score >= 90) {
+    return "A";
+  }
+  if (score >= 80) {
+    return "B";
+  }
+  if (score >= 70) {
+    return "C";
+  }
+  if (score >= 60) {
+    return "D";
+  }
   return "F";
 }
-
 export function analyzeContract(text) {
   const sentences = splitSentences(text);
   const context = extractTerms(text);
