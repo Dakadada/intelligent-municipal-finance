@@ -2,7 +2,7 @@
 // the town's books have been read, and the red pencil ticks each finding as
 // it goes by. About four seconds; click, press any key, or "Skip" to jump in.
 
-import { esc, count, money2, date } from "./format.js";
+import { esc, count, money2, month } from "./format.js";
 import { TICKS } from "./pen.js";
 
 const ROW_H = 33;
@@ -31,7 +31,7 @@ export function playReader(app, done) {
       .map((t) => {
         const al = flagged.get(t.id);
         return `<div class="stream-row${al ? " hit" : ""}"${al ? ` data-alert="${al.id}"` : ""}>
-          <span class="num">${date(t.date)}</span>
+          <span class="num">${month(t.date.slice(0, 7))}</span>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.vendor)} · ${esc(t.description)}</span>
           <span class="r">${money2(t.amount)}</span>
           <span class="t${al ? "" : " ok"}">${al ? TICKS[al.type]?.mark ?? "?" : "✓"}</span></div>`;

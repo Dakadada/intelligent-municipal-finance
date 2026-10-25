@@ -1,5 +1,6 @@
-// Public browser API: enrich a ledger, run independent models, combine related
-// findings, and expose reviewable evidence without changing the source data.
+// Coordinate the audit through one stable interface for the browser UI.
+// Independent rules and models produce evidence, overlapping alerts are merged,
+// and summaries link back to original payments so clerks can verify each finding.
 import { generateLedger, PLANTED_CASES } from "./data/generator.js";
 import { clusterVendors } from "./algo/vendorMatch.js";
 import { isolationEvidence } from "./algo/isolationForest.js";
@@ -22,102 +23,123 @@ export const DEFAULT_SETTINGS = {
 };
 export const loadSampleLedger = () => generateLedger();
 const month = (date) => date.slice(0, 7);
-const monthAt = (m, offset) => {
-  const [y, n] = m.split("-").map(Number);
-  return new Date(Date.UTC(y, n - 1 + offset, 1)).toISOString().slice(0, 7);
+const monthAt = (monthKey, offset) => {
+  const [calendarYear, monthNumber] = monthKey.split("-").map(Number);
+  return new Date(Date.UTC(calendarYear, monthNumber - 1 + offset, 1))
+    .toISOString()
+    .slice(0, 7);
 };
 const fiscalYear = (date, start) =>
   +date.slice(0, 4) + (start !== 1 && +date.slice(5, 7) >= start ? 1 : 0);
 function span(first, last) {
   const result = [];
-  for (let m = first; m <= last; m = monthAt(m, 1)) result.push(m);
+  for (let monthKey = first; monthKey <= last; monthKey = monthAt(monthKey, 1)) {
+    result.push(monthKey);
+  }
   return result;
 }
-function buildVendors(txns, groups, months, asOf) {
-  const cutoff = monthAt(month(asOf), -11) + "-01",
-    priorCutoff = monthAt(month(asOf), -23) + "-01";
+function buildVendors(transactions, groups, months, asOf) {
+  const cutoff = monthAt(month(asOf), -11) + "-01";
+  const priorCutoff = monthAt(month(asOf), -23) + "-01";
   return groups
     .map((group) => {
-      const rows = txns.filter((t) => t.vendorCanonical === group.canonical);
-      const recent = rows.filter((t) => t.date >= cutoff && t.date <= asOf),
-        prior = rows.filter((t) => t.date >= priorCutoff && t.date < cutoff);
+      const rows = transactions.filter(
+        (transaction) => transaction.vendorCanonical === group.canonical,
+      );
+      const recent = rows.filter(
+        (transaction) => transaction.date >= cutoff && transaction.date <= asOf,
+      );
+      const prior = rows.filter(
+        (transaction) => transaction.date >= priorCutoff && transaction.date < cutoff,
+      );
       const enough = recent.length >= 3 && prior.length >= 3;
       const monthly = new Map();
-      for (const t of rows)
+      for (const transaction of rows) {
         monthly.set(
-          month(t.date),
-          (monthly.get(month(t.date)) ?? 0) + t.amount,
+          month(transaction.date),
+          (monthly.get(month(transaction.date)) ?? 0) + transaction.amount,
         );
+      }
       return {
         ...group,
         txnCount: rows.length,
-        total: sum(rows.map((t) => t.amount)),
+        total: sum(rows.map((transaction) => transaction.amount)),
         firstSeen: rows[0].date,
         lastSeen: rows.at(-1).date,
-        avgInvoice: mean(rows.map((t) => t.amount)),
-        recentAvg: enough ? mean(recent.map((t) => t.amount)) : null,
-        priorAvg: enough ? mean(prior.map((t) => t.amount)) : null,
+        avgInvoice: mean(rows.map((transaction) => transaction.amount)),
+        recentAvg: enough ? mean(recent.map((transaction) => transaction.amount)) : null,
+        priorAvg: enough ? mean(prior.map((transaction) => transaction.amount)) : null,
         changePct:
-          enough && mean(prior.map((t) => t.amount)) > 0
-            ? (mean(recent.map((t) => t.amount)) /
-                mean(prior.map((t) => t.amount)) -
+          enough && mean(prior.map((transaction) => transaction.amount)) > 0
+            ? (mean(recent.map((transaction) => transaction.amount)) /
+                mean(prior.map((transaction) => transaction.amount)) -
                 1) *
               100
             : null,
-        categoryIds: [...new Set(rows.map((t) => t.categoryId))],
+        categoryIds: [...new Set(rows.map((transaction) => transaction.categoryId))],
         alertIds: [],
-        monthly: months.map((m) => ({ month: m, total: monthly.get(m) ?? 0 })),
+        monthly: months.map((monthKey) => ({
+          month: monthKey,
+          total: monthly.get(monthKey) ?? 0,
+        })),
         recentCutoff: cutoff,
       };
     })
-    .sort((a, b) => b.total - a.total);
+    .sort((firstEntry, secondEntry) => secondEntry.total - firstEntry.total);
 }
 const severityRank = { critical: 0, high: 1, medium: 2 };
 function mergeAlerts(candidates) {
   const merged = [];
   for (const candidate of candidates.sort(
-    (a, b) =>
-      severityRank[a.severity] - severityRank[b.severity] || b.score - a.score,
+    (firstEntry, secondEntry) =>
+      severityRank[firstEntry.severity] - severityRank[secondEntry.severity] ||
+      secondEntry.score - firstEntry.score,
   )) {
-    const ids = new Set(candidate.txnIds),
-      overlap = merged.filter((a) => a.txnIds.some((id) => ids.has(id)));
+    const ids = new Set(candidate.txnIds);
+    const overlap = merged.filter((firstEntry) => firstEntry.txnIds.some((id) => ids.has(id)));
     if (!overlap.length) {
       merged.push({ ...candidate });
       continue;
     }
-    const keep = overlap[0],
-      all = [keep, ...overlap.slice(1), candidate];
-    keep.txnIds = [...new Set(all.flatMap((a) => a.txnIds))];
-    keep.detectors = [...new Set(all.flatMap((a) => a.detectors))];
-    keep.reasons = [...new Set(all.flatMap((a) => a.reasons))];
+    const keep = overlap[0];
+    const all = [keep, ...overlap.slice(1), candidate];
+    keep.txnIds = [...new Set(all.flatMap((firstEntry) => firstEntry.txnIds))];
+    keep.detectors = [...new Set(all.flatMap((firstEntry) => firstEntry.detectors))];
+    keep.reasons = [...new Set(all.flatMap((firstEntry) => firstEntry.reasons))];
     // Keep at most four readable evidence statements, with each detector's
     // first explanation preferred to repeated details from the same rule.
     keep.reasons = [
-      ...new Set(all.map((a) => a.reasons[0]).concat(keep.reasons)),
+      ...new Set(all.map((firstEntry) => firstEntry.reasons[0]).concat(keep.reasons)),
     ].slice(0, 4);
-    keep.score = Math.max(...all.map((a) => a.score));
-    for (const drop of overlap.slice(1)) merged.splice(merged.indexOf(drop), 1);
+    keep.score = Math.max(...all.map((firstEntry) => firstEntry.score));
+    for (const drop of overlap.slice(1)) {
+      merged.splice(merged.indexOf(drop), 1);
+    }
   }
   return merged
     .sort(
-      (a, b) =>
-        severityRank[a.severity] - severityRank[b.severity] ||
-        b.score - a.score,
+      (firstEntry, secondEntry) =>
+        severityRank[firstEntry.severity] - severityRank[secondEntry.severity] ||
+        secondEntry.score - firstEntry.score,
     )
-    .map((a, i) => ({ ...a, id: `A${String(i + 1).padStart(3, "0")}` }));
+    .map((firstEntry, i) => ({ ...firstEntry, id: `A${String(i + 1).padStart(3, "0")}` }));
 }
-function evaluate(txns, alerts) {
+function evaluate(transactions, alerts) {
   // This is the only analysis function allowed to inspect demonstration labels.
-  const labeled = txns.filter((t) => t.planted);
-  if (!labeled.length) return null;
-  const known = new Map(PLANTED_CASES.map((c) => [c.id, c]));
-  const cases = [...new Set(labeled.map((t) => t.planted))].map((id) => {
+  const labeled = transactions.filter((transaction) => transaction.planted);
+  if (!labeled.length) {
+    return null;
+  }
+  const known = new Map(PLANTED_CASES.map((caseEntry) => [caseEntry.id, caseEntry]));
+  const cases = [...new Set(labeled.map((transaction) => transaction.planted))].map((id) => {
     const ids = new Set(
-      labeled.filter((t) => t.planted === id).map((t) => t.id),
+      labeled
+        .filter((transaction) => transaction.planted === id)
+        .map((transaction) => transaction.id),
     );
     const alertIds = alerts
-      .filter((a) => a.txnIds.some((t) => ids.has(t)))
-      .map((a) => a.id);
+      .filter((firstEntry) => firstEntry.txnIds.some((transaction) => ids.has(transaction)))
+      .map((firstEntry) => firstEntry.id);
     return {
       id,
       label: known.get(id)?.label ?? id,
@@ -126,121 +148,151 @@ function evaluate(txns, alerts) {
       alertIds,
     };
   });
-  const ids = new Set(labeled.map((t) => t.id));
+  const ids = new Set(labeled.map((transaction) => transaction.id));
   return {
     total: cases.length,
-    caught: cases.filter((c) => c.caught).length,
+    caught: cases.filter((caseEntry) => caseEntry.caught).length,
     cases,
-    alertsOnPlanted: alerts.filter((a) => a.txnIds.some((id) => ids.has(id)))
+    alertsOnPlanted: alerts.filter((firstEntry) => firstEntry.txnIds.some((id) => ids.has(id)))
       .length,
     alertsTotal: alerts.length,
   };
 }
-export function runAnalysis(ledger, settings = DEFAULT_SETTINGS) {
-  settings = { ...DEFAULT_SETTINGS, ...settings };
-  const asOf = ledger.town.asOf,
-    txns = ledger.txns
-      .map((t) => ({ ...t, alertIds: [] }))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-  const groups = clusterVendors(
-      txns.map((t) => t.vendor),
-      settings.vendorSimilarity,
-    ),
-    lookup = new Map();
-  for (const g of groups) for (const a of g.aliases) lookup.set(a, g.canonical);
-  txns.forEach((t) => {
-    t.vendorCanonical = lookup.get(t.vendor);
-  });
-  const months = txns.length
-    ? span(month(txns[0].date), month(txns.at(-1).date))
-    : [];
-  const vendors = buildVendors(txns, groups, months, asOf),
-    categoryMap = new Map();
-  for (const t of txns) {
-    if (!categoryMap.has(t.categoryId))
-      categoryMap.set(t.categoryId, {
-        id: t.categoryId,
-        name: t.category,
-        dept: t.dept,
+function buildCategories(transactions) {
+  const categoryMap = new Map();
+  for (const transaction of transactions) {
+    if (!categoryMap.has(transaction.categoryId)) {
+      categoryMap.set(transaction.categoryId, {
+        id: transaction.categoryId,
+        name: transaction.category,
+        dept: transaction.dept,
         total: 0,
         txnCount: 0,
       });
-    const c = categoryMap.get(t.categoryId);
-    c.total += t.amount;
-    c.txnCount++;
+    }
+    const categoryEntry = categoryMap.get(transaction.categoryId);
+    categoryEntry.total += transaction.amount;
+    categoryEntry.txnCount++;
   }
   const categories = [...categoryMap.values()].sort(
-    (a, b) => b.total - a.total,
+    (firstEntry, secondEntry) => secondEntry.total - firstEntry.total,
   );
+  return categories;
+}
+
+function attachAlertReferences(transactions, vendors, alerts, patterns) {
+  const txnMap = new Map(transactions.map((transaction) => [transaction.id, transaction]));
+  for (const firstEntry of alerts) {
+    for (const id of firstEntry.txnIds) {
+      txnMap.get(id)?.alertIds.push(firstEntry.id);
+    }
+    for (const vendor of vendors) {
+      if (
+        firstEntry.txnIds.some((id) => txnMap.get(id)?.vendorCanonical === vendor.canonical) ||
+        firstEntry.vendor === vendor.canonical
+      ) {
+        vendor.alertIds.push(firstEntry.id);
+      }
+    }
+  }
+  // The transaction's back-reference already identifies its merged alert.
+  for (const [categoryId, pattern] of Object.entries(patterns)) {
+    for (const point of pattern.months) {
+      if (!point.flagged) {
+        continue;
+      }
+      const affected = transactions.find(
+        (transaction) =>
+          transaction.categoryId === categoryId &&
+          month(transaction.date) === point.month &&
+          transaction.alertIds.length,
+      );
+      point.alertId = affected?.alertIds[0] ?? null;
+    }
+  }
+}
+
+function buildSummary(transactions, alerts, vendors, lookup, asOf, ledger) {
+  const fyTotals = new Map();
+  for (const transaction of transactions) {
+    fyTotals.set(transaction.fy, (fyTotals.get(transaction.fy) ?? 0) + transaction.amount);
+  }
+  const summary = {
+    txnCount: transactions.length,
+    totalSpend: sum(transactions.map((transaction) => transaction.amount)),
+    firstDate: transactions[0]?.date ?? null,
+    lastDate: transactions.at(-1)?.date ?? null,
+    currentFy: fiscalYear(asOf, ledger.town.fyStartMonth ?? 7),
+    fyTotals: [...fyTotals]
+      .sort((firstEntry, secondEntry) => firstEntry[0] - secondEntry[0])
+      .map(([fy, total]) => ({ fy, total })),
+    alertCount: alerts.length,
+    criticalCount: alerts.filter((firstEntry) => firstEntry.severity === "critical").length,
+    highCount: alerts.filter((firstEntry) => firstEntry.severity === "high").length,
+    mediumCount: alerts.filter((firstEntry) => firstEntry.severity === "medium").length,
+    flaggedDollars: sum(
+      transactions
+        .filter((transaction) => transaction.alertIds.length)
+        .map((transaction) => transaction.amount),
+    ),
+    vendorCount: vendors.length,
+    rawVendorNames: lookup.size,
+  };
+  return summary;
+}
+
+export function runAnalysis(ledger, settings = DEFAULT_SETTINGS) {
+  settings = { ...DEFAULT_SETTINGS, ...settings };
+  const asOf = ledger.town.asOf;
+  const transactions = ledger.txns
+    .map((transaction) => ({ ...transaction, alertIds: [] }))
+    .sort(
+      (firstEntry, secondEntry) =>
+        firstEntry.date.localeCompare(secondEntry.date) ||
+        firstEntry.id.localeCompare(secondEntry.id),
+    );
+  const groups = clusterVendors(
+    transactions.map((transaction) => transaction.vendor),
+    settings.vendorSimilarity,
+  );
+  const lookup = new Map();
+  for (const vendorGroup of groups) {
+    for (const alias of vendorGroup.aliases) {
+      lookup.set(alias, vendorGroup.canonical);
+    }
+  }
+  transactions.forEach((transaction) => {
+    transaction.vendorCanonical = lookup.get(transaction.vendor);
+  });
+  const months = transactions.length
+    ? span(month(transactions[0].date), month(transactions.at(-1).date))
+    : [];
+  const vendors = buildVendors(transactions, groups, months, asOf);
+  const categories = buildCategories(transactions);
   const { patterns, alerts: seasonal } = buildPatterns(
-    txns,
+    transactions,
     categories,
     months,
     settings,
   );
   const alerts = mergeAlerts([
-    ...detectRules(txns, vendors, settings),
+    ...detectRules(transactions, vendors, settings),
     ...seasonal,
-    ...isolationEvidence(txns, vendors, settings),
+    ...isolationEvidence(transactions, vendors, settings),
   ]);
-  const txnMap = new Map(txns.map((t) => [t.id, t]));
-  for (const a of alerts) {
-    for (const id of a.txnIds) txnMap.get(id)?.alertIds.push(a.id);
-    for (const v of vendors)
-      if (
-        a.txnIds.some(
-          (id) => txnMap.get(id)?.vendorCanonical === v.canonical,
-        ) ||
-        a.vendor === v.canonical
-      )
-        v.alertIds.push(a.id);
-  }
-  // The transaction's back-reference already identifies its merged alert.
-  for (const [categoryId, pattern] of Object.entries(patterns)) {
-    for (const point of pattern.months) {
-      if (!point.flagged) continue;
-      const affected = txns.find(
-        (t) =>
-          t.categoryId === categoryId &&
-          month(t.date) === point.month &&
-          t.alertIds.length,
-      );
-      point.alertId = affected?.alertIds[0] ?? null;
-    }
-  }
-  const fyTotals = new Map();
-  for (const t of txns)
-    fyTotals.set(t.fy, (fyTotals.get(t.fy) ?? 0) + t.amount);
-  const summary = {
-    txnCount: txns.length,
-    totalSpend: sum(txns.map((t) => t.amount)),
-    firstDate: txns[0]?.date ?? null,
-    lastDate: txns.at(-1)?.date ?? null,
-    currentFy: fiscalYear(asOf, ledger.town.fyStartMonth ?? 7),
-    fyTotals: [...fyTotals]
-      .sort((a, b) => a[0] - b[0])
-      .map(([fy, total]) => ({ fy, total })),
-    alertCount: alerts.length,
-    criticalCount: alerts.filter((a) => a.severity === "critical").length,
-    highCount: alerts.filter((a) => a.severity === "high").length,
-    mediumCount: alerts.filter((a) => a.severity === "medium").length,
-    flaggedDollars: sum(
-      txns.filter((t) => t.alertIds.length).map((t) => t.amount),
-    ),
-    vendorCount: vendors.length,
-    rawVendorNames: lookup.size,
-  };
+  attachAlertReferences(transactions, vendors, alerts, patterns);
+  const summary = buildSummary(transactions, alerts, vendors, lookup, asOf, ledger);
   return {
     town: { ...ledger.town },
     asOf,
     settings,
     summary,
     categories,
-    txns,
+    txns: transactions,
     alerts,
-    vendors: vendors.map(({ recentCutoff, ...v }) => v),
+    vendors: vendors.map(({ recentCutoff, ...vendor }) => vendor),
     patterns,
     forecast: buildForecast(ledger, categories, asOf),
-    evaluation: evaluate(txns, alerts),
+    evaluation: evaluate(transactions, alerts),
   };
 }

@@ -1,84 +1,104 @@
-// Boost shallow regression trees along the negative Huber-loss gradient.
-// Huber clips large residuals so one unusual bill cannot drag the baseline up.
+// Predict ordinary monthly spending with many small regression trees. Each
+// tree corrects the previous prediction using the Huber loss, which limits the
+// pull of extreme bills. Month and time features fit seasonal city spending.
 import { mean, median, quantile, mad } from "./stats.js";
-import { dollars } from "./rules.js";
-function predictTree(tree, x) {
-  return tree.value !== undefined
-    ? tree.value
-    : predictTree(x[tree.feature] <= tree.cut ? tree.left : tree.right, x);
+import { dollars, monthName } from "./rules.js";
+function predictTree(tree, featureRow) {
+  if (tree.value !== undefined) return tree.value;
+  let nextBranch = tree.right;
+  if (featureRow[tree.feature] <= tree.cut) nextBranch = tree.left;
+  return predictTree(nextBranch, featureRow);
 }
-function treeFit(X, y, indices, depth, minLeaf) {
-  const value = mean(indices.map((i) => y[i]));
-  if (!depth || indices.length < minLeaf * 2) return { value };
+function treeFit(featureRows, targets, indices, depth, minLeaf) {
+  const value = mean(indices.map((i) => targets[i]));
+  if (!depth || indices.length < minLeaf * 2) {
+    return { value };
+  }
   let best = null;
-  for (let f = 0; f < X[0].length; f++) {
-    const sorted = [...indices].sort((a, b) => X[a][f] - X[b][f]);
-    let leftSum = 0,
-      leftSq = 0;
-    const total = indices.reduce((s, i) => s + y[i], 0),
-      totalSq = indices.reduce((s, i) => s + y[i] ** 2, 0);
-    for (let k = 1; k < sorted.length; k++) {
-      const v = y[sorted[k - 1]];
-      leftSum += v;
-      leftSq += v * v;
+  for (let featureIndex = 0; featureIndex < featureRows[0].length; featureIndex++) {
+    const sorted = [...indices].sort(
+      (firstIndex, secondIndex) =>
+        featureRows[firstIndex][featureIndex] - featureRows[secondIndex][featureIndex],
+    );
+    let leftSum = 0;
+    let leftSq = 0;
+    const total = indices.reduce((predictionTotal, i) => predictionTotal + targets[i], 0);
+    const totalSq = indices.reduce(
+      (predictionTotal, i) => predictionTotal + targets[i] ** 2,
+      0,
+    );
+    // Running sums evaluate every cut without rebuilding both groups.
+    for (let splitIndex = 1; splitIndex < sorted.length; splitIndex++) {
+      const observedValue = targets[sorted[splitIndex - 1]];
+      leftSum += observedValue;
+      leftSq += observedValue * observedValue;
       if (
-        k < minLeaf ||
-        sorted.length - k < minLeaf ||
-        X[sorted[k - 1]][f] === X[sorted[k]][f]
-      )
+        splitIndex < minLeaf ||
+        sorted.length - splitIndex < minLeaf ||
+        featureRows[sorted[splitIndex - 1]][featureIndex] ===
+          featureRows[sorted[splitIndex]][featureIndex]
+      ) {
         continue;
+      }
       const loss =
         leftSq -
-        leftSum ** 2 / k +
+        leftSum ** 2 / splitIndex +
         totalSq -
         leftSq -
-        (total - leftSum) ** 2 / (sorted.length - k);
-      if (!best || loss < best.loss)
+        (total - leftSum) ** 2 / (sorted.length - splitIndex);
+      if (!best || loss < best.loss) {
         best = {
           loss,
-          feature: f,
-          cut: (X[sorted[k - 1]][f] + X[sorted[k]][f]) / 2,
+          feature: featureIndex,
+          cut:
+            (featureRows[sorted[splitIndex - 1]][featureIndex] +
+              featureRows[sorted[splitIndex]][featureIndex]) /
+            2,
           sorted,
-          k,
+          k: splitIndex,
         };
+      }
     }
   }
-  if (!best) return { value };
+  if (!best) {
+    return { value };
+  }
   return {
     feature: best.feature,
     cut: best.cut,
-    left: treeFit(X, y, best.sorted.slice(0, best.k), depth - 1, minLeaf),
-    right: treeFit(X, y, best.sorted.slice(best.k), depth - 1, minLeaf),
+    left: treeFit(featureRows, targets, best.sorted.slice(0, best.k), depth - 1, minLeaf),
+    right: treeFit(featureRows, targets, best.sorted.slice(best.k), depth - 1, minLeaf),
   };
 }
 export function fitGBM(
-  X,
-  y,
+  featureRows,
+  targets,
   { trees = 70, learningRate = 0.08, maxDepth = 3, minLeaf = 3 } = {},
 ) {
-  const base = median(y),
-    fitted = y.map(() => base),
-    forest = [];
+  const base = median(targets);
+  const fitted = targets.map(() => base);
+  const forest = [];
+  // A fixed clipping cutoff keeps one outlier from controlling the gradients.
   const delta = Math.max(
     1e-6,
     quantile(
-      y.map((v) => Math.abs(v - base)),
+      targets.map((observedValue) => Math.abs(observedValue - base)),
       0.95,
     ),
   );
-  for (let t = 0; t < trees && y.length; t++) {
-    const residuals = y.map((v, i) => v - fitted[i]);
-    const gradient = residuals.map((r) => Math.max(-delta, Math.min(delta, r)));
+  for (let treeIndex = 0; treeIndex < trees && targets.length; treeIndex++) {
+    const residuals = targets.map((observedValue, i) => observedValue - fitted[i]);
+    const gradient = residuals.map((residual) => Math.max(-delta, Math.min(delta, residual)));
     const tree = treeFit(
-      X,
+      featureRows,
       gradient,
-      y.map((_, i) => i),
+      targets.map((unusedValue, i) => i),
       maxDepth,
       minLeaf,
     );
     forest.push(tree);
-    fitted.forEach((_, i) => {
-      fitted[i] += learningRate * predictTree(tree, X[i]);
+    fitted.forEach((unusedValue, i) => {
+      fitted[i] += learningRate * predictTree(tree, featureRows[i]);
     });
   }
   return {
@@ -86,84 +106,99 @@ export function fitGBM(
     learningRate,
     maxDepth,
     loss: "huber",
-    predict: (x) =>
-      base + learningRate * forest.reduce((s, t) => s + predictTree(t, x), 0),
+    predict: (featureRow) =>
+      base +
+      learningRate *
+        forest.reduce(
+          (predictionTotal, tree) => predictionTotal + predictTree(tree, featureRow),
+          0,
+        ),
   };
 }
-
 const month = (date) => date.slice(0, 7);
 
-export function buildPatterns(txns, categories, months, settings) {
-  const patterns = {},
-    alerts = [];
-  for (const cat of categories) {
-    const rows = txns.filter((t) => t.categoryId === cat.id),
-      totals = new Map();
-    for (const t of rows)
-      totals.set(month(t.date), (totals.get(month(t.date)) ?? 0) + t.amount);
-    const y = months.map((m) => totals.get(m) ?? 0),
-      X = months.map((m, i) => [+m.slice(5), i]);
-    // Cross-fit by twelve-month block: the assessed year's observations are
-    // excluded, so a large payment cannot train away its own anomaly.
-    const options = { trees: 70, learningRate: 0.08, maxDepth: 3 };
-    const model = fitGBM(X, y, options),
-      predictions = [];
-    for (let block = 0; block < Math.ceil(months.length / 12); block++) {
-      const trainIndices = y
-        .map((_, i) => i)
-        .filter((i) => Math.floor(i / 12) !== block);
-      const heldOut = fitGBM(
-        trainIndices.map((i) => X[i]),
-        trainIndices.map((i) => y[i]),
-        options,
-      );
-      for (
-        let i = block * 12;
-        i < Math.min(months.length, (block + 1) * 12);
-        i++
-      )
-        predictions[i] = Math.max(0, heldOut.predict(X[i]));
+function fitHeldOutYears(featureRows, targets, months) {
+  // Cross-fit by twelve-month block: the assessed year's observations are
+  // excluded, so a large payment cannot train away its own anomaly.
+  const options = { trees: 70, learningRate: 0.08, maxDepth: 3 };
+  const model = fitGBM(featureRows, targets, options);
+  const predictions = [];
+  for (let block = 0; block < Math.ceil(months.length / 12); block++) {
+    const trainIndices = targets
+      .map((unusedValue, i) => i)
+      .filter((i) => Math.floor(i / 12) !== block);
+    const heldOut = fitGBM(
+      trainIndices.map((i) => featureRows[i]),
+      trainIndices.map((i) => targets[i]),
+      options,
+    );
+    for (let i = block * 12; i < Math.min(months.length, (block + 1) * 12); i++) {
+      predictions[i] = Math.max(0, heldOut.predict(featureRows[i]));
     }
-    const residuals = y.map((v, i) => v - predictions[i]);
-    const residualSd = Math.max(mad(residuals), median(y) * 0.08, 25);
-    const points = months.map((m, i) => {
+  }
+  return { model, predictions };
+}
+
+export function buildPatterns(transactions, categories, months, settings) {
+  const patterns = {};
+  const alerts = [];
+  for (const category of categories) {
+    const rows = transactions.filter((transaction) => transaction.categoryId === category.id);
+    const totals = new Map();
+    for (const transaction of rows) {
+      totals.set(
+        month(transaction.date),
+        (totals.get(month(transaction.date)) ?? 0) + transaction.amount,
+      );
+    }
+    const targets = months.map((monthKey) => totals.get(monthKey) ?? 0);
+    const featureRows = months.map((monthKey, i) => [+monthKey.slice(5), i]);
+    const { model, predictions } = fitHeldOutYears(featureRows, targets, months);
+    const residuals = targets.map((observedValue, i) => observedValue - predictions[i]);
+    const residualSd = Math.max(mad(residuals), median(targets) * 0.08, 25);
+    const points = months.map((monthKey, i) => {
       const expected = predictions[i];
-      const lower = Math.max(0, expected - settings.bandK * residualSd),
-        upper = expected + settings.bandK * residualSd;
+      const lower = Math.max(0, expected - settings.bandK * residualSd);
+      const upper = expected + settings.bandK * residualSd;
       const flagged =
         months.length >= 36 &&
-        y[i] > upper &&
-        y[i] - expected > Math.max(1500, expected * 0.35);
+        targets[i] > upper &&
+        targets[i] - expected > Math.max(1500, expected * 0.35);
       if (flagged) {
-        const affected = rows.filter((t) => month(t.date) === m);
+        const affected = rows.filter((transaction) => month(transaction.date) === monthKey);
         alerts.push({
           type: "seasonal",
           severity: "high",
           score: Math.min(
             0.96,
-            0.78 + ((y[i] - upper) / Math.max(y[i], 1)) * 0.15,
+            0.78 + ((targets[i] - upper) / Math.max(targets[i], 1)) * 0.15,
           ),
           title: "Spending above seasonal pattern",
-          headline: `${cat.name} spending was ${dollars(y[i])} in ${m}, above the seasonal upper band of ${dollars(upper)}.`,
+          headline:
+            `${category.name} spending in ${monthName(monthKey)} was ${dollars(targets[i])}; ` +
+            `the usual range for that month is up to ${dollars(upper)}.`,
           reasons: [
-            `The Huber boosted-tree model expects ${dollars(expected)} for this month; the assessed year was excluded from training.`,
-            `The robust spending band uses a ${settings.bandK}-standard-deviation allowance of ${dollars(settings.bandK * residualSd)}.`,
+            "The Huber boosted-tree model expects " +
+              `${dollars(expected)}` +
+              " for this month; the assessed year was excluded from training.",
+            "The robust spending band uses a " +
+              `${settings.bandK}` +
+              "-standard-deviation allowance of " +
+              `${dollars(settings.bandK * residualSd)}` +
+              ".",
           ],
           detectors: ["gbm-baseline"],
-          txnIds: affected.map((t) => t.id),
-          vendor:
-            affected.length === 1
-              ? affected[0].vendorCanonical
-              : "Multiple vendors",
-          category: cat.name,
-          categoryId: cat.id,
-          amount: y[i] - expected,
-          date: affected.at(-1)?.date ?? `${m}-01`,
+          txnIds: affected.map((transaction) => transaction.id),
+          vendor: affected.length === 1 ? affected[0].vendorCanonical : "Multiple vendors",
+          category: category.name,
+          categoryId: category.id,
+          amount: targets[i] - expected,
+          date: affected.at(-1)?.date ?? `${monthKey}-01`,
         });
       }
       return {
-        month: m,
-        actual: y[i],
+        month: monthKey,
+        actual: targets[i],
         expected,
         lower,
         upper,
@@ -171,7 +206,7 @@ export function buildPatterns(txns, categories, months, settings) {
         alertId: null,
       };
     });
-    patterns[cat.id] = {
+    patterns[category.id] = {
       model: {
         trees: model.trees.length,
         learningRate: model.learningRate,

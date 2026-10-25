@@ -1,5 +1,6 @@
-// Jaro counts nearby matching letters; Winkler rewards a shared prefix.
-// Vendor groups use complete linkage: every alias must meet the cutoff.
+// Ledger clerks can spell one supplier's name several ways. Jaro-Winkler
+// measures matching letters and shared prefixes, then groups names only when
+// every alias meets the cutoff. This avoids joining unrelated suppliers by a chain.
 export function normalize(name) {
   return String(name)
     .toLowerCase()
@@ -9,57 +10,73 @@ export function normalize(name) {
     .replace(/\s+/g, " ")
     .trim();
 }
-export function jaroWinkler(a, b) {
-  if (a === b) return 1;
-  if (!a.length || !b.length) return 0;
-  const radius = Math.max(0, Math.floor(Math.max(a.length, b.length) / 2) - 1);
-  const am = new Array(a.length).fill(false),
-    bm = new Array(b.length).fill(false);
+
+export function jaroWinkler(firstName, secondName) {
+  if (firstName === secondName) return 1;
+  if (!firstName.length || !secondName.length) return 0;
+
+  const radius = Math.max(
+    0,
+    Math.floor(Math.max(firstName.length, secondName.length) / 2) - 1,
+  );
+  const firstMatches = new Array(firstName.length).fill(false);
+  const secondMatches = new Array(secondName.length).fill(false);
   let matches = 0;
-  for (let i = 0; i < a.length; i++) {
-    for (
-      let j = Math.max(0, i - radius);
-      j <= Math.min(b.length - 1, i + radius);
-      j++
-    ) {
-      if (!bm[j] && a[i] === b[j]) {
-        am[i] = bm[j] = true;
+
+  // A letter can match only once, and only within the search window.
+  for (let i = 0; i < firstName.length; i++) {
+    const firstPosition = Math.max(0, i - radius);
+    const lastPosition = Math.min(secondName.length - 1, i + radius);
+    for (let j = firstPosition; j <= lastPosition; j++) {
+      if (!secondMatches[j] && firstName[i] === secondName[j]) {
+        firstMatches[i] = true;
+        secondMatches[j] = true;
         matches++;
         break;
       }
     }
   }
   if (!matches) return 0;
-  const ac = [...a].filter((_, i) => am[i]),
-    bc = [...b].filter((_, i) => bm[i]);
-  const transpositions = ac.filter((v, i) => v !== bc[i]).length / 2;
+
+  const firstLetters = [...firstName].filter((letter, i) => firstMatches[i]);
+  const secondLetters = [...secondName].filter((letter, i) => secondMatches[i]);
+  const transpositions =
+    firstLetters.filter((letter, i) => letter !== secondLetters[i]).length / 2;
   const jaro =
-    (matches / a.length +
-      matches / b.length +
+    (matches / firstName.length +
+      matches / secondName.length +
       (matches - transpositions) / matches) /
     3;
-  let prefix = 0;
-  while (prefix < Math.min(4, a.length, b.length) && a[prefix] === b[prefix])
-    prefix++;
-  return jaro > 0.7 ? jaro + prefix * 0.1 * (1 - jaro) : jaro;
+
+  let prefixLength = 0;
+  while (
+    prefixLength < Math.min(4, firstName.length, secondName.length) &&
+    firstName[prefixLength] === secondName[prefixLength]
+  ) {
+    prefixLength++;
+  }
+  if (jaro > 0.7) return jaro + prefixLength * 0.1 * (1 - jaro);
+  return jaro;
 }
+
 export function clusterVendors(names, threshold = 0.93) {
   const groups = [];
-  for (const name of [...new Set(names)].sort()) {
-    const group = groups.find((g) =>
-      g.aliases.every(
+  const uniqueNames = [...new Set(names)].sort();
+  for (const name of uniqueNames) {
+    const group = groups.find((candidate) =>
+      candidate.aliases.every(
         (alias) => jaroWinkler(normalize(alias), normalize(name)) >= threshold,
       ),
     );
-    if (!group)
+    if (!group) {
       groups.push({ canonical: name, aliases: [name], similarity: 1 });
-    else {
-      group.similarity = Math.min(
-        group.similarity,
-        ...group.aliases.map((a) => jaroWinkler(normalize(a), normalize(name))),
-      );
-      group.aliases.push(name);
+      continue;
     }
+    const similarities = group.aliases.map((alias) =>
+      jaroWinkler(normalize(alias), normalize(name)),
+    );
+    group.similarity = Math.min(group.similarity, ...similarities);
+    group.aliases.push(name);
   }
   return groups;
 }

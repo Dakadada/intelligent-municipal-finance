@@ -1,5 +1,6 @@
-// Fictional municipal agreements and labeled clause examples for a small,
-// transparent classifier. Labels describe procurement risk, not legality.
+// These fictional city contracts cover common risky and protective terms.
+// Eighty separately labeled clauses train the word-frequency classifier; the
+// four longer agreements let students compare its findings with actual wording.
 export const SAMPLE_CONTRACTS = [
   {
     id: "janitorial",
@@ -7,9 +8,29 @@ export const SAMPLE_CONTRACTS = [
     vendor: "Midwest Janitorial Solutions",
     category: "Janitorial Services",
     annualValue: 46800,
-    text: `The City of Willow Creek engages Midwest Janitorial Solutions to clean City Hall, the public library, and the police station. The initial term is 36 months beginning July 1, 2026. The annual value is $46,800, payable in twelve equal monthly installments after receipt of an invoice. Services include vacuuming, restroom sanitation, trash collection, and floor care on weekdays when the buildings are open.
-The agreement will automatically renew for successive twelve month periods unless the City delivers written notice at least 90 days before the anniversary date. Renewal does not require a new competitive solicitation. The annual fee shall increase by 6% on each anniversary, with no maximum cumulative increase and no price cap. The contractor may substitute equivalent cleaning products without prior approval.
-The City shall provide storage space, water, and building access. The contractor shall maintain liability insurance and report damage promptly. Complaints will be discussed at the next scheduled meeting, but no minimum response time or service credit is established. Invoices are due within thirty days. Any additional work requested by a department supervisor will be billed separately at the contractor's published hourly rate. Disputes shall first be discussed by the city administrator and the contractor's account manager.`,
+    text:
+      "The City of Willow Creek engages Midwest Janitorial Solutions to " +
+      "clean City Hall, the public library, and the police station. The " +
+      "initial term is 36 months beginning July 1, 2026. The annual " +
+      "value is $46,800, payable in twelve equal monthly installments " +
+      "after receipt of an invoice. Services include vacuuming, restroom " +
+      "sanitation, trash collection, and floor care on weekdays when the " +
+      "buildings are open.\nThe agreement will automatically renew for " +
+      "successive twelve month periods unless the City delivers written " +
+      "notice at least 90 days before the anniversary date. Renewal does " +
+      "not require a new competitive solicitation. The annual fee shall " +
+      "increase by 6% on each anniversary, with no maximum cumulative " +
+      "increase and no price cap. The contractor may substitute " +
+      "equivalent cleaning products without prior approval.\nThe City " +
+      "shall provide storage space, water, and building access. The " +
+      "contractor shall maintain liability insurance and report damage " +
+      "promptly. Complaints will be discussed at the next scheduled " +
+      "meeting, but no minimum response time or service credit is " +
+      "established. Invoices are due within thirty days. Any additional " +
+      "work requested by a department supervisor will be billed " +
+      "separately at the contractor's published hourly rate. Disputes " +
+      "shall first be discussed by the city administrator and the " +
+      "contractor's account manager.",
   },
   {
     id: "software",
@@ -17,9 +38,29 @@ The City shall provide storage space, water, and building access. The contractor
     vendor: "CivicSoft Systems",
     category: "Software & IT",
     annualValue: 27050,
-    text: `CivicSoft Systems grants the City of Willow Creek a nonexclusive license to use its utility billing and general ledger software for municipal operations. The initial term is 48 months beginning July 1, 2026. The annual value is $27,050 for the first year and covers twenty named users, standard support, and hosted storage. The City retains ownership of its accounting records and shall designate an administrator to manage user access.
-This agreement will automatically renew for additional twelve month terms unless written notice is received 120 days before expiration. Each renewal is charged at then-current rates. The vendor may change fees and service features unilaterally by posting a revised schedule on its customer portal. No price cap applies to renewal charges. Early termination requires payment of all remaining license fees as a termination penalty.
-Support is available during ordinary business hours by email. Maintenance windows may interrupt access, and no guaranteed uptime or service credit is offered. Data exports will be provided in the vendor's standard format upon request, subject to professional services charges. The City is responsible for reviewing portal notices and maintaining current contact details. The vendor shall protect account credentials and notify the City of a confirmed security incident. Payment is due thirty days after invoice receipt.`,
+    text:
+      "CivicSoft Systems grants the City of Willow Creek a nonexclusive " +
+      "license to use its utility billing and general ledger software " +
+      "for municipal operations. The initial term is 48 months beginning " +
+      "July 1, 2026. The annual value is $27,050 for the first year and " +
+      "covers twenty named users, standard support, and hosted storage. " +
+      "The City retains ownership of its accounting records and shall " +
+      "designate an administrator to manage user access.\nThis agreement " +
+      "will automatically renew for additional twelve month terms unless " +
+      "written notice is received 120 days before expiration. Each " +
+      "renewal is charged at then-current rates. The vendor may change " +
+      "fees and service features unilaterally by posting a revised " +
+      "schedule on its customer portal. No price cap applies to renewal " +
+      "charges. Early termination requires payment of all remaining " +
+      "license fees as a termination penalty.\nSupport is available " +
+      "during ordinary business hours by email. Maintenance windows may " +
+      "interrupt access, and no guaranteed uptime or service credit is " +
+      "offered. Data exports will be provided in the vendor's standard " +
+      "format upon request, subject to professional services charges. " +
+      "The City is responsible for reviewing portal notices and " +
+      "maintaining current contact details. The vendor shall protect " +
+      "account credentials and notify the City of a confirmed security " +
+      "incident. Payment is due thirty days after invoice receipt.",
   },
   {
     id: "snow",
@@ -27,9 +68,30 @@ Support is available during ordinary business hours by email. Maintenance window
     vendor: "Hawkeye Snow & Ice LLC",
     category: "Snow & Ice Removal",
     annualValue: 72000,
-    text: `Following a competitive bid advertised publicly and evaluated by the City Council, the City of Willow Creek awards snow and ice removal services to Hawkeye Snow & Ice LLC. The term is 12 months beginning July 1, 2026. The annual value is $72,000 and total payments shall not exceed $72,000 without a written council amendment. The attached route map and unit price schedule define the work, equipment, and authorized treatment materials.
-The contractor shall begin priority routes within two hours after dispatch and clear designated emergency corridors within four hours after snowfall ends. These performance metrics form the service level agreement. Failure to meet the response standard requires a documented corrective plan and a credit of $250 for each missed event. GPS route logs and material quantities must accompany each invoice.
-Renewal requires written council approval following a review of performance and available competitive offers. Annual price increases are capped at the lesser of CPI or 3%. The City may terminate for convenience upon 30 days written notice without penalty, paying only for completed authorized work. The City retains audit rights to inspect payroll, route records, and subcontractor invoices for three years. The contractor shall carry liability insurance, train drivers, and report accidents immediately. Department staff will verify quantities before approving payment.`,
+    text:
+      "Following a competitive bid advertised publicly and evaluated by " +
+      "the City Council, the City of Willow Creek awards snow and ice " +
+      "removal services to Hawkeye Snow & Ice LLC. The term is 12 months " +
+      "beginning July 1, 2026. The annual value is $72,000 and total " +
+      "payments shall not exceed $72,000 without a written council " +
+      "amendment. The attached route map and unit price schedule define " +
+      "the work, equipment, and authorized treatment materials.\nThe " +
+      "contractor shall begin priority routes within two hours after " +
+      "dispatch and clear designated emergency corridors within four " +
+      "hours after snowfall ends. These performance metrics form the " +
+      "service level agreement. Failure to meet the response standard " +
+      "requires a documented corrective plan and a credit of $250 for " +
+      "each missed event. GPS route logs and material quantities must " +
+      "accompany each invoice.\nRenewal requires written council approval " +
+      "following a review of performance and available competitive " +
+      "offers. Annual price increases are capped at the lesser of CPI or " +
+      "3%. The City may terminate for convenience upon 30 days written " +
+      "notice without penalty, paying only for completed authorized " +
+      "work. The City retains audit rights to inspect payroll, route " +
+      "records, and subcontractor invoices for three years. The " +
+      "contractor shall carry liability insurance, train drivers, and " +
+      "report accidents immediately. Department staff will verify " +
+      "quantities before approving payment.",
   },
   {
     id: "consulting",
@@ -37,9 +99,30 @@ Renewal requires written council approval following a review of performance and 
     vendor: "Summit Strategy Partners LLC",
     category: "Professional Services",
     annualValue: 48750,
-    text: `The City of Willow Creek retains Summit Strategy Partners LLC to provide administrative and strategic advisory support as needed. The term is 24 months beginning August 1, 2026. The estimated annual value is $48,750, but this estimate is provided for planning purposes only and is not a spending limit. The scope includes, but is not limited to, organizational review, meeting attendance, stakeholder engagement, research, and other assistance requested by city staff.
-Work will be billed on a time and materials basis at hourly rates ranging from $175 to $325 plus travel and incidental expenses. There is no not-to-exceed amount and no maximum number of billable hours. The consultant may change hourly rates unilaterally upon written notice. Department managers may request additional tasks by email without a formal amendment or council vote.
-The consultant will provide updates as needed and may deliver recommendations orally or in writing. The agreement does not specify milestone dates, measurable acceptance criteria, or a required final report. The City will make records and staff reasonably available. Monthly invoices will summarize hours by consultant but need not allocate hours to individual deliverables. Payment is due within thirty days. Either party may request a meeting to discuss concerns, and unfinished work will remain billable at the applicable hourly rates.`,
+    text:
+      "The City of Willow Creek retains Summit Strategy Partners LLC to " +
+      "provide administrative and strategic advisory support as needed. " +
+      "The term is 24 months beginning August 1, 2026. The estimated " +
+      "annual value is $48,750, but this estimate is provided for " +
+      "planning purposes only and is not a spending limit. The scope " +
+      "includes, but is not limited to, organizational review, meeting " +
+      "attendance, stakeholder engagement, research, and other " +
+      "assistance requested by city staff.\nWork will be billed on a time " +
+      "and materials basis at hourly rates ranging from $175 to $325 " +
+      "plus travel and incidental expenses. There is no not-to-exceed " +
+      "amount and no maximum number of billable hours. The consultant " +
+      "may change hourly rates unilaterally upon written notice. " +
+      "Department managers may request additional tasks by email without " +
+      "a formal amendment or council vote.\nThe consultant will provide " +
+      "updates as needed and may deliver recommendations orally or in " +
+      "writing. The agreement does not specify milestone dates, " +
+      "measurable acceptance criteria, or a required final report. The " +
+      "City will make records and staff reasonably available. Monthly " +
+      "invoices will summarize hours by consultant but need not allocate " +
+      "hours to individual deliverables. Payment is due within thirty " +
+      "days. Either party may request a meeting to discuss concerns, and " +
+      "unfinished work will remain billable at the applicable hourly " +
+      "rates.",
   },
 ];
 // Each example has its own wording rather than merely repeating a template.
