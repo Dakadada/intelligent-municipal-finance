@@ -2,7 +2,7 @@
 // read and how much needs a person; the queue below is sorted by risk.
 
 import { esc, money, money2, moneyShort, count, date, month, plural } from "../format.js";
-import { circleSvg, TICKS } from "../pen.js";
+import { circleSvg, tallySvg, TICKS } from "../pen.js";
 import { runwayChart } from "../charts.js";
 import { store } from "../store.js";
 
@@ -16,6 +16,7 @@ export function reviewView(el, app) {
   const years = s.fyTotals.length;
 
   el.innerHTML = `
+    <div class="hero">
     <section class="thesis">
       <span class="eyebrow">Review queue · ${date(s.firstDate)} to ${date(s.lastDate)}</span>
       <h1>${count(s.txnCount)} transactions read. ${open.length
@@ -23,12 +24,14 @@ export function reviewView(el, app) {
         : `<span style="color:var(--ok)">All reviewed.</span>`}</h1>
       <p class="lede">A traditional audit samples a small share of transactions every year or two. Red Pen checked every one of them${years > 1 ? ` across ${years} fiscal years` : ""} using four models and a set of rules drawn from Iowa State Auditor findings. Each flag below explains itself in plain English.</p>
       <div class="facts">
-        <div class="fact"><b>${moneyShort(s.totalSpend)}</b><span>spending checked</span></div>
+        <div class="fact"><b>${moneyShort(s.totalSpend).replace(/^\$(\d)M$/, "$$$1.0M")}</b><span>spending checked</span></div>
         <div class="fact"><b>${money(s.flaggedDollars)}</b><span>in flagged payments</span></div>
         <div class="fact"><b>${count(s.vendorCount)}</b><span>vendors, from ${count(s.rawVendorNames)} spellings</span></div>
         ${ev ? `<div class="fact"><a href="#/method"><b>${ev.caught} of ${ev.total}</b><span>planted test problems caught</span></a></div>` : ""}
       </div>
     </section>
+    ${tallyBlock(a)}
+    </div>
 
     <div class="grid-2">
       <section class="section" aria-labelledby="queue-h">
@@ -80,6 +83,17 @@ export function reviewView(el, app) {
   };
 
   el.addEventListener("click", (e) => {
+    const tl = e.target.closest("[data-tally]");
+    if (tl) {
+      filter.type = filter.type === tl.dataset.tally ? "all" : tl.dataset.tally;
+      filter.show = "all";
+      el.querySelector("#type").value = filter.type;
+      el.querySelectorAll(".seg [data-show]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.show === filter.show));
+      el.querySelectorAll("[data-tally]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.tally === filter.type));
+      renderQueue();
+      el.querySelector("#queue-h").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     const b = e.target.closest("[data-show]");
     if (b) {
       filter.show = b.dataset.show;
@@ -99,7 +113,7 @@ function row(x, decision) {
   return `<a class="lrow ${decision ? "done" : x.severity}" role="listitem" href="#/case/${x.id}">
     <span class="date num">${x.date ? date(x.date, { year: false }) : "—"}<br><span style="font-size:11px">${x.date ? x.date.slice(0, 4) : ""}</span></span>
     <span class="what"><b>${esc(x.title)}</b><span>${decided ? `${decided} · ` : ""}${esc(x.headline)}</span></span>
-    <span class="amt">${money2(x.amount)}</span>
+    <span class="amt">${money2(x.amount)}${x.type === "vendor-increase" ? `<br><span class="faint" style="font-size:11px;font-weight:500">est. extra cost</span>` : ""}</span>
     <span class="tick" title="${esc(tick.label)}">${decision ? "✓" : tick.mark}</span>
   </a>`;
 }
@@ -139,4 +153,26 @@ export function catRow(c) {
       <i class="${c.status === "ok" ? "" : c.status}" style="width:${w(c.spentToDate)}"></i>
       <u style="left:${w(c.budget)}"></u>
     </div></a>`;
+}
+
+// The auditor's tally sheet: one line per kind of finding, counted in pencil.
+function tallyBlock(a) {
+  const rows = Object.entries(TICKS)
+    .map(([type, t]) => {
+      const list = a.alerts.filter((x) => x.type === type);
+      return { type, t, n: list.length, dollars: list.reduce((sum, x) => sum + (x.amount ?? 0), 0) };
+    })
+    .filter((r) => r.n)
+    .sort((p, q) => q.n - p.n);
+  if (!rows.length) return "";
+  return `<aside class="tally-sheet" aria-label="Findings by kind">
+    <span class="eyebrow">Tally</span>
+    ${rows.map((r, i) => `
+      <button type="button" class="tally-row" data-tally="${r.type}" aria-pressed="${filter.type === r.type}">
+        <span class="tick-mark">${r.t.mark}</span>
+        <span class="tally-label">${esc(r.t.label[0].toUpperCase() + r.t.label.slice(1))}<small>${money(r.dollars)}</small></span>
+        ${tallySvg(r.n, { seed: i + 2, delay: 0.5 + i * 0.25 })}
+        <span class="tally-n num">${r.n}</span>
+      </button>`).join("")}
+  </aside>`;
 }

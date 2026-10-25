@@ -121,6 +121,7 @@ a { color: var(--model); }
 .topbar-actions { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
 .pill { font-size: 12px; border: 1px solid var(--rule-strong); border-radius: 99px; padding: 3px 10px; color: var(--ink-2); white-space: nowrap; }
 .pill.sample { border-style: dashed; }
+#view:focus { outline: none; }
 .view {
   padding: var(--s-6) var(--s-6) var(--s-8);
   padding-right: max(var(--s-6), env(safe-area-inset-right, 0px));
@@ -170,12 +171,26 @@ textarea.input { font-family: var(--f-display); font-size: 15px; line-height: 1.
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--s-7); align-items: start; }
 
 /* ---------- review: thesis ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--s-7); align-items: end; }
+.tally-sheet { display: grid; border-top: 2px solid var(--ink); align-self: end; }
+.tally-sheet .eyebrow { padding: 8px 0; border-bottom: 1px solid var(--rule-strong); }
+.tally-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 28px; gap: var(--s-3); align-items: center;
+  padding: 9px 4px; border: 0; border-bottom: 1px solid var(--rule); background: none; text-align: left; cursor: pointer; color: inherit;
+}
+.tally-row:hover { background: var(--sheet-2); }
+.tally-row[aria-pressed="true"] { background: var(--pencil-wash); }
+.tally-row .tick-mark { font: 700 21px/1 var(--f-pen); color: var(--pencil); text-align: center; }
+.tally-label { font-size: 13.5px; font-weight: 600; display: grid; }
+.tally-label small { font-size: 12px; font-weight: 400; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.tally { display: block; max-width: 160px; height: auto; }
+.tally-n { font-family: var(--f-display); font-weight: 600; font-size: 18px; text-align: right; }
 .thesis { display: grid; gap: var(--s-3); }
 .thesis h1 { font-size: clamp(30px, 4.2vw, 52px); line-height: 1.06; max-width: 20ch; letter-spacing: -0.015em; }
-.thesis .lede { color: var(--ink-2); max-width: 64ch; font-size: 16px; }
+.thesis .lede { color: var(--ink-2); max-width: 60ch; font-size: 16px; text-wrap: pretty; }
 .circled { position: relative; white-space: nowrap; color: var(--pencil); }
 .circled > svg { position: absolute; left: -3%; top: 2%; width: 106%; height: 104%; overflow: visible; pointer-events: none; }
-.facts { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-7); padding-top: var(--s-3); }
+.facts { display: flex; flex-wrap: wrap; gap: var(--s-3) clamp(20px, 3vw, 44px); padding-top: var(--s-3); }
 .fact { display: grid; gap: 1px; }
 .fact b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fact span { font-size: 12px; color: var(--ink-3); }
@@ -439,7 +454,7 @@ a.sc-row:hover { background: var(--sheet-2); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1080px) {
-  .grid-2, .case, .doc { grid-template-columns: minmax(0, 1fr); }
+  .grid-2, .case, .doc, .hero { grid-template-columns: minmax(0, 1fr); }
   .margin { position: static; }
 }
 @media (max-width: 820px) {

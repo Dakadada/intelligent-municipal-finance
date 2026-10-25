@@ -64,6 +64,7 @@ export function caseView(el, app, [id]) {
             <span class="eyebrow">${esc(al.title)} · <span class="pen" style="font-size:18px;letter-spacing:0">${tick.mark}</span></span>
           </div>
           <span class="amount num">${money2(al.amount)}</span>
+          ${al.type === "vendor-increase" ? `<span class="eyebrow" style="letter-spacing:.08em">Estimated extra cost at the higher prices</span>` : ""}
           <span class="muted">${esc(al.vendor)} · ${esc(al.category)}${al.date ? ` · ${date(al.date)}` : ""}</span>
         </div>
 

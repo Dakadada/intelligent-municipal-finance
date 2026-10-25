@@ -82,3 +82,29 @@ export const TICKS = {
   seasonal: { mark: "~", label: "out of season" },
   isolation: { mark: "?", label: "unusual pattern" },
 };
+
+// Auditor's tally marks: groups of four strokes crossed by a fifth.
+// Returns an SVG drawn stroke by stroke with the pencil animation.
+export function tallySvg(n, { seed = 1, delay = 0 } = {}) {
+  const rng = makeRng(seed * 31 + 5);
+  const H = 26;
+  const GAP = 7;
+  const GROUP = 4 * GAP + 10;
+  const parts = [];
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const g = Math.floor(i / 5);
+    const j = i % 5;
+    const x0 = g * GROUP + 4;
+    let d;
+    if (j < 4) {
+      const x = x0 + j * GAP + (rng() - 0.5) * 1.6;
+      d = `M${f(x)} ${f(3 + rng() * 2)} L${f(x + (rng() - 0.5) * 2.4)} ${f(H - 2 - rng() * 2)}`;
+    } else {
+      d = `M${f(x0 - 4)} ${f(H - 6 + rng() * 2)} L${f(x0 + 3 * GAP + 4)} ${f(5 + rng() * 3)}`;
+    }
+    parts.push(`<path class="ink-draw animate" style="--len:40;--dur:.18s;--delay:${(delay + k++ * 0.07).toFixed(2)}s" d="${d}"/>`);
+  }
+  const w = Math.max(1, Math.ceil(n / 5)) * GROUP;
+  return `<svg class="tally" viewBox="0 0 ${w} ${H}" width="${w}" height="${H}" aria-hidden="true" fill="none" stroke="var(--pencil)" stroke-width="2.2" stroke-linecap="round">${parts.join("")}</svg>`;
+}

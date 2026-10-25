@@ -134,7 +134,8 @@ function mergeVendorPricing(alerts) {
     // Combine only independently flagged pricing evidence for this supplier.
     // Monthly spending context is handled separately and cannot add payments.
     existing.txnIds = [...new Set([...existing.txnIds, ...alert.txnIds])];
-    existing.amount = Math.max(existing.amount, alert.amount);
+    // Keep the amount that matches the headline we keep, so the dollar figure
+    // a clerk sees always agrees with the sentence under it.
     addEvidence(existing, alert);
   }
   return combined;
