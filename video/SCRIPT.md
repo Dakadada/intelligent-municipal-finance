@@ -13,7 +13,7 @@ its purpose in one clear sentence, and a demonstration of what it does.
 | 0:12 – 0:16 | Points dim | David | "So no one ever reads every line." |
 | 0:16 – 0:22 | Red beam sweeps through, findings get circled | Srihari | "Red Pen does." |
 | 0:22 – 0:27 | Overhead shot, cut to the paper card | David | "We're David Shi, Srihari Kumaresan, and Alex Du, and we built Red Pen, an app that checks every transaction a small city makes and marks only the ones a person should review." |
-| 0:27 – 0:36 | App intro: the ledger streams by, then the review queue | Srihari | "When a clerk opens it, Red Pen has already read the whole ledger. Here it checked 1,885 transactions and found 20 worth a look." |
+| 0:27 – 0:36 | App intro: the ledger streams by, then the review queue | Srihari | "A clerk drops in the city's spending file, and Red Pen reads every line in about a second. Here it checked 1,885 transactions and found 20 worth a look." |
 | 0:36 – 0:50 | Case file: duplicate payment, chart, reasons, mark reviewed | David | "Every finding explains itself in plain English. This janitorial invoice was paid twice, twelve days apart. The clerk adds a note and marks it reviewed, and the decision goes into a public audit log. Red Pen never blocks or changes a payment. People decide." |
 | 0:50 – 0:56 | Vendors: merged spellings | Srihari | "It matches vendor names letter by letter, so a duplicate can't hide behind 'Bobs Plumbing' versus 'Bob's Plumbing Service.'" |
 | 0:56 – 1:04 | Spending patterns: July snow bill circled | David | "A gradient-boosted model learns what each category should cost every month. Snow removal in July stands out right away." |
