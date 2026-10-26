@@ -16,6 +16,7 @@ export function reviewView(el, app) {
   const years = s.fyTotals.length;
 
   el.innerHTML = `
+    ${importNote(app.lastImport)}
     <div class="hero">
     <section class="thesis">
       <span class="eyebrow">Review queue · ${date(s.firstDate)} to ${date(s.lastDate)}</span>
@@ -56,6 +57,11 @@ export function reviewView(el, app) {
 
       <aside class="section" aria-labelledby="runway-h" id="runway-side"></aside>
     </div>`;
+
+  el.querySelector("#import-ok")?.addEventListener("click", (e) => {
+    app.lastImport = null;
+    e.target.closest(".import-note").remove();
+  });
 
   const renderQueue = () => {
     const q = filter.q.trim().toLowerCase();
@@ -176,4 +182,20 @@ function tallyBlock(a) {
         <span class="tally-n num">${r.n}</span>
       </button>`).join("")}
   </aside>`;
+}
+
+// Right after an upload: what was read, which of the file's columns were
+// used for what, and which rows were skipped, so the clerk can trust the import.
+function importNote(imp) {
+  if (!imp) return "";
+  const renamed = Object.entries(imp.columns ?? {}).filter(([field, name]) => field !== name.toLowerCase());
+  const skipped = imp.warnings.filter((w) => w.includes("skipped"));
+  return `<div class="import-note notice ok" role="status">
+    <div>
+      <b>Read ${count(imp.rows)} payments from ${esc(imp.name)}.</b>
+      ${renamed.length ? `<span>Columns used: ${renamed.map(([field, name]) => `${esc(name)} → ${field}`).join(", ")}.</span>` : ""}
+      ${skipped.length ? `<details><summary>${count(skipped.length)} ${skipped.length === 1 ? "row was" : "rows were"} skipped</summary>${skipped.slice(0, 20).map((w) => `<div>${esc(w)}</div>`).join("")}${skipped.length > 20 ? `<div>…and ${count(skipped.length - 20)} more.</div>` : ""}</details>` : ""}
+    </div>
+    <button class="btn sm" type="button" id="import-ok">Got it</button>
+  </div>`;
 }

@@ -1,8 +1,8 @@
-// Your data & settings: load a city's own spending export, and tune how
-// sensitive each check is. Everything runs in this browser.
+// Settings: which books are loaded, and how sensitive each check is.
+// Uploading a file lives on the start screen. Everything runs in this browser.
 
-import { esc, count, money } from "../format.js";
-import { CSV_TEMPLATE, DEFAULT_SETTINGS } from "../../engine.js";
+import { esc, count, money, date } from "../format.js";
+import { DEFAULT_SETTINGS } from "../../engine.js";
 import { store } from "../store.js";
 
 const SLIDERS = [
@@ -28,25 +28,23 @@ export function dataView(el, app) {
   const s = app.analysis.summary;
   el.innerHTML = `
     <header class="view-head">
-      <span class="eyebrow">Your data &amp; settings</span>
-      <h1>Run it on your own city's books</h1>
-      <p>Export spending from your accounting system (MUNIS, QuickBooks, Caselle, or a spreadsheet) as a CSV and drop it here. The file is read in your browser and never uploaded.</p>
+      <span class="eyebrow">Settings</span>
+      <h1>Data and sensitivity</h1>
+      <p>Choose which books Red Pen checks, and how sensitive each check is. Changes re-run the whole analysis in your browser.</p>
     </header>
 
     <div class="grid-2">
       <section class="section">
-        <label class="drop" id="drop" for="file">
-          <span class="pen" style="font-size:26px">Drop a CSV file here</span>
-          <span class="muted">or <u>choose a file</u>. Needed columns: <b>date, vendor, amount, category</b>. Optional: invoice, description, department, budget.</span>
-          <input id="file" type="file" accept=".csv,text/csv" class="sr">
-        </label>
-        <div id="upload-msg"></div>
-        <div class="toolbar">
-          <button class="btn" type="button" id="template">Download template</button>
-          ${app.source === "upload" ? `<button class="btn" type="button" id="sample">Switch back to the sample town</button>` : ""}
+        <div class="section-head"><h2>Data source</h2></div>
+        <div class="source sheet">
+          <span class="eyebrow">${app.source === "sample" ? "Sample data" : "Your file"}</span>
+          <b>${app.source === "sample" ? "Willow Creek, Iowa (made-up town)" : esc(app.uploadName)}</b>
+          <p class="fineprint">${count(s.txnCount)} payments, ${date(s.firstDate)} to ${date(s.lastDate)} · analyzed in ${Math.round(app.runtimeMs)} ms.${app.source === "sample" ? " Ten problems were planted in its books to test Red Pen." : " Stored only in this browser."}</p>
+          <div class="toolbar">
+            <a class="btn primary" href="#/start">${app.source === "sample" ? "Upload your city's spending" : "Upload a different file"}</a>
+            ${app.source === "upload" ? `<button class="btn" type="button" id="sample">Switch to the sample town</button>` : ""}
+          </div>
         </div>
-        <pre class="code">${esc(CSV_TEMPLATE)}</pre>
-        <p class="fineprint">Now showing: ${app.source === "sample" ? "Willow Creek, a fictional town with ten known problems planted in its books" : esc(app.uploadName)} · ${count(s.txnCount)} transactions · analyzed in ${Math.round(app.runtimeMs)} ms.</p>
       </section>
 
       <section class="section">
@@ -91,37 +89,10 @@ export function dataView(el, app) {
     e.target.textContent = "Decisions cleared";
     e.target.disabled = true;
   });
-  el.querySelector("#template").addEventListener("click", () => {
-    const url = URL.createObjectURL(new Blob([CSV_TEMPLATE], { type: "text/csv" }));
-    const link = Object.assign(document.createElement("a"), { href: url, download: "red-pen-template.csv" });
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
   el.querySelector("#sample")?.addEventListener("click", () => {
     app.useSample();
     dataView(replace(el), app);
   });
-
-  const msg = el.querySelector("#upload-msg");
-  const handle = async (file) => {
-    if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      msg.innerHTML = `<p class="notice">That file is ${(file.size / 1048576).toFixed(1)} MB. Export one fiscal year at a time (under 15 MB).</p>`;
-      return;
-    }
-    const text = await file.text();
-    const res = app.useUpload(file.name, text);
-    if (!res.ok) {
-      msg.innerHTML = `<p class="notice">Couldn't find any usable rows in ${esc(file.name)}. Check that it has date, vendor, amount, and category columns.${res.warnings.length ? `<br>${res.warnings.slice(0, 3).map(esc).join("<br>")}` : ""}</p>`;
-      return;
-    }
-    location.hash = "#/review";
-  };
-  el.querySelector("#file").addEventListener("change", (e) => handle(e.target.files[0]));
-  const drop = el.querySelector("#drop");
-  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
-  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); handle(e.dataTransfer.files[0]); });
 }
 
 function replace(el) {

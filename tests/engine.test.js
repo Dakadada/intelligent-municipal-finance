@@ -73,6 +73,22 @@ test("CSV handles quotes, invalid dates, zero dollars, budgets and empty data", 
     runAnalysis(parseLedgerCSV("date,vendor,amount,category").ledger).summary.txnCount,
   ).toBe(0);
 });
+test("CSV reads common accounting-export headers, dates, and negatives", () => {
+  const parsedCsv = parseLedgerCSV(
+    "Check Date,Payee Name,Net Amount,Account Description,Invoice #,Fiscal Year\n" +
+      '7/1/2026,"Acme, Inc","$1,250.00",Office Supplies,A-1,2027\n' +
+      "07/15/26 0:00,Bob's Plumbing,(40.00),Repairs,B-2,2027\n" +
+      "2/30/2026,Bad Date,10,Office,,2027",
+  );
+  expect(parsedCsv.columns.vendor).toBe("Payee Name");
+  expect(parsedCsv.ledger.txns.length).toBe(2);
+  expect(parsedCsv.ledger.txns[0].date).toBe("2026-07-01");
+  expect(parsedCsv.ledger.txns[0].amount).toBe(1250);
+  expect(parsedCsv.ledger.txns[1].amount).toBe(-40);
+  expect(parsedCsv.ledger.txns[0].invoice).toBe("A-1");
+  expect(parsedCsv.warnings.length).toBe(1);
+  expect(parseLedgerCSV("When,Who,How much\n2026-01-01,x,1").warnings.length).toBe(4);
+});
 test("sample contracts contain substantial text and safety distinctions", () => {
   expect(SAMPLE_CONTRACTS.length).toBe(4);
   for (const sampleContract of SAMPLE_CONTRACTS) {

@@ -14,8 +14,10 @@ import { vendorsView } from "./ui/views/vendors.js";
 import { contractsView } from "./ui/views/contracts.js";
 import { dataView } from "./ui/views/data.js";
 import { methodView } from "./ui/views/method.js";
+import { startView } from "./ui/views/start.js";
 
 const ROUTES = {
+  start: startView,
   review: reviewView,
   case: caseView,
   patterns: patternsView,
@@ -65,12 +67,15 @@ const app = {
   },
 
   useUpload(name, text) {
-    const { ledger, warnings } = parseLedgerCSV(text);
+    const { ledger, warnings, columns } = parseLedgerCSV(text);
     if (!ledger.txns.length) return { ok: false, warnings };
     store.setUploaded({ name, text });
     this.ledger = ledger;
     this.source = "upload";
     this.uploadName = name;
+    // Shown once at the top of the review queue, so the clerk can check the
+    // import read their file the way they expected.
+    this.lastImport = { name, rows: ledger.txns.length, warnings, columns };
     this.analyze();
     this.chrome();
     return { ok: true, warnings, rows: ledger.txns.length };
@@ -93,6 +98,16 @@ const app = {
     location.hash = `#/${path}`;
   },
 
+  // Leave the start screen for the review queue, watching it read the books.
+  enter() {
+    try { localStorage.setItem("redpen.welcomed", "1"); } catch {}
+    location.hash = "#/review";
+    playReader(this, () => {
+      try { sessionStorage.setItem("redpen.read", "1"); } catch {}
+      render();
+    });
+  },
+
   // Sidebar count + top bar text.
   chrome() {
     const a = this.analysis;
@@ -107,9 +122,18 @@ const app = {
     document.getElementById("topbar-actions").innerHTML =
       this.source === "sample"
         ? `<span class="pill sample" title="Willow Creek is a fictional town. Ten real-world problems were planted in its books to test the system.">Sample town</span>`
-        : `<span class="pill">Your file: ${esc(this.uploadName ?? "upload.csv")}</span>`;
+        : `<span class="pill">Your file: ${esc(this.uploadName ?? "upload.csv")}</span><a class="btn sm ghost" href="#/start">Change file</a>`;
+    document.getElementById("sample-bar").innerHTML = this.source === "sample"
+      ? `<p><b>You're viewing sample data.</b> Willow Creek, Iowa is a made-up town with 10 problems planted in its books to test Red Pen.</p><a class="btn sm primary" href="#/start">Check your own city's spending →</a>`
+      : "";
   },
 };
+
+// First-time visitors who arrive at the bare address start on the welcome
+// screen. Links to a specific view (#/review, #/case/A004) always go there.
+function welcomed() {
+  try { return localStorage.getItem("redpen.welcomed") === "1"; } catch { return true; }
+}
 
 function render() {
   const [name = "review", ...rest] = location.hash.replace(/^#\/?/, "").split("/");
@@ -119,7 +143,9 @@ function render() {
   const el = old.cloneNode(false);
   old.replaceWith(el);
   const navName = name === "case" ? "review" : name;
-  document.querySelectorAll(".nav a").forEach((a) => {
+  document.getElementById("sample-bar").hidden = name === "start" || app.source !== "sample";
+  document.querySelector(".topbar").hidden = name === "start";
+  document.querySelectorAll(".nav a, .rail-cta").forEach((a) => {
     if (a.dataset.route === navName) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
@@ -146,6 +172,8 @@ function boot() {
   app.load();
   app.analyze();
   app.chrome();
+  const first = !location.hash && app.source === "sample" && !welcomed();
+  if (first) history.replaceState(null, "", "#/start");
   window.addEventListener("hashchange", () => {
     render();
     document.getElementById("view").focus({ preventScroll: true });
@@ -156,7 +184,7 @@ function boot() {
   // First visit this session: watch it read the books.
   let seen = false;
   try { seen = sessionStorage.getItem("redpen.read") === "1"; } catch {}
-  if (!seen && !location.hash.startsWith("#/case")) {
+  if (!seen && !location.hash.startsWith("#/case") && !location.hash.startsWith("#/start")) {
     playReader(app, () => {
       try { sessionStorage.setItem("redpen.read", "1"); } catch {}
       render();
