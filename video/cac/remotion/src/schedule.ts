@@ -32,9 +32,9 @@ const SCENES: { id: string; lines: number[] }[] = [
 const LIMIT = 178;
 const plan = (k: number) => {
   const inGap = 0.32 * k, lead = 0.5 * k, tail = 0.42 * k, hold = 2.2;
-  // Cut into the team card about a second after the cold open's paper card lands (the card
-  // appears 2.6 s before the end of intro.mp4; see render_intro.mjs).
-  const introUse = intro.length - 1.5;
+  // The cold open's paper card ("1,885 transactions read. 20 need you.") appears 2.6 s before the
+  // end of intro.mp4 (see render_intro.mjs); hold its last frame so the card stays up about 3 s.
+  const introUse = intro.length + 1.4;
   const start: Record<number, number> = {};
   for (let i = 1; i <= 5; i++) start[i] = (intro.cues as any)[`l${i}`][0];
   const scenes: { id: string; from: number; to: number; lines: number[] }[] = [{ id: "intro", from: 0, to: introUse, lines: [1, 2, 3, 4, 5] }];

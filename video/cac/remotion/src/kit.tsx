@@ -152,7 +152,8 @@ export const FaceBubble: React.FC<{ fromLine: number }> = ({ fromLine }) => {
   for (const l of lines) if (l.id >= fromLine && t >= START[l.id] - 0.15) cur = { id: l.id, speaker: l.speaker };
   if (!cur) return null;
   const first = START[fromLine] - 0.15;
-  const appear = ramp(t, first, first + 0.4);
+  const lastEnd = lineEnd(lines[lines.length - 1].id);
+  const appear = ramp(t, first, first + 0.4) * (1 - ramp(t, lastEnd + 0.15, lastEnd + 0.75));
   const swap = ramp(t, START[cur.id] - 0.15, START[cur.id] + 0.2);
   const who = SPEAKERS[cur.speaker];
   const l = line(cur.id);

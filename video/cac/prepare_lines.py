@@ -271,6 +271,15 @@ def takes(folder):
             found[num] = (f, body, score)
             got.append(num)
         print(f"{f.name}: {who}, lines {sorted(got)}")
+    # Hand fixes where the transcriber merged a false start into the good read: keep only the
+    # words from `start` on, with the retake's opening words timed by hand (whisper small, 2026-10-26).
+    OVERRIDES = {14: {"file": "alex_cac.mov", "start": 54.85, "prepend": [
+        ("And", 55.0, 55.22), ("before", 55.24, 55.46), ("the", 55.48, 55.6), ("council", 55.62, 55.9), ("signs", 55.92, 56.18)]}}
+    for num, o in OVERRIDES.items():
+        if num in found and found[num][0].name == o["file"]:
+            f, body, sc = found[num]
+            body = [{"w": w, "s": s, "e": e} for w, s, e in o["prepend"]] + [h for h in body if h["s"] >= 56.15]
+            found[num] = (f, body, sc)
     # Lines nobody has recorded yet keep their previous entry (placeholder voice) so the edit
     # still renders end to end.
     base = tmp / "timeline-tts.json" if (tmp / "timeline-tts.json").exists() else PUB / "timeline.json"

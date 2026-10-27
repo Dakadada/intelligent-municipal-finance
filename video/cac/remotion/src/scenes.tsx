@@ -21,9 +21,15 @@ const ev = (c: Clip, kind: string) => c.events.find((e) => e.kind === kind)!;
 
 /* -------------------------------------------------------------- 1. intro */
 
+// The cold open, then its last frame (the paper card) held until the cut to the team card.
 export const Intro: React.FC = () => (
   <AbsoluteFill style={{ background: C.night }}>
-    <OffthreadVideo src={staticFile("footage/intro.mp4")} muted style={{ width: "100%", height: "100%" }} />
+    <Img src={staticFile("still/intro-last.png")} style={{ width: "100%", height: "100%" }} />
+    <Sequence durationInFrames={Math.floor(INTRO.length * FPS) - 1} layout="none">
+      <AbsoluteFill>
+        <OffthreadVideo src={staticFile("footage/intro.mp4")} muted style={{ width: "100%", height: "100%" }} />
+      </AbsoluteFill>
+    </Sequence>
   </AbsoluteFill>
 );
 
