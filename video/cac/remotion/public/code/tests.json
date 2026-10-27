@@ -1,0 +1,66 @@
+{
+ "version": "bun test v1.4.4",
+ "files": [
+  {
+   "file": "tests/rules-quality.test.js",
+   "tests": [
+    "a repeated invoice number overrides an otherwise regular monthly cadence",
+    "an irregular equal-amount pair remains suspicious",
+    "routine identical prices across months are not duplicate payments",
+    "near-limit invoices are routine for a supplier that normally bills that amount",
+    "one vendor gets one split alert with each amount and no above-limit invoices",
+    "large first payments need at least six months of earlier ledger history"
+   ]
+  },
+  {
+   "file": "tests/third-pass.test.js",
+   "tests": [
+    "forecast improves held-out annual totals and applies exact materiality rules",
+    "seasonal context never expands the three paving invoices",
+    "review queue stays focused without losing any demonstration cases",
+    "all clerk-facing alerts use ordinary words and readable dates",
+    "alias similarity records the worst pair of actual spellings",
+    "contract grades follow the requested bands and verdicts explain terms",
+    "generator still contains every intended fiscal year and payment",
+    "three consecutive large cost increases do not wait for a full year"
+   ]
+  },
+  {
+   "file": "tests/readability.test.js",
+   "tests": [
+    "unchanged CSV parsing and tree calculations retain their results"
+   ]
+  },
+  {
+   "file": "tests/engine.test.js",
+   "tests": [
+    "Jaro-Winkler known example and punctuation aliases",
+    "isolation forest isolates a distant point deterministically",
+    "Huber boosted trees learn a nonlinear signal despite one outlier",
+    "seasonal ARIMA recovers yearly drift and seeded intervals",
+    "naive Bayes actually learns labels",
+    "CSV handles quotes, invalid dates, zero dollars, budgets and empty data",
+    "CSV reads common accounting-export headers, dates, and negatives",
+    "sample contracts contain substantial text and safety distinctions",
+    "end to end respects public interface, determinism, labels boundary and speed",
+    "generator invoice numbers do not collide with unrelated transactions",
+    "clause rules distinguish a capped hourly agreement from open-ended billing",
+    "rules detect duplicates, splits, and price increases",
+    "sentence offsets preserve decimal prices and every source character",
+    "calendar fiscal years and sparse no-budget forecasts stay finite",
+    "uncapped escalation is risky even without an explicit no-cap sentence",
+    "negated protections do not earn protective findings",
+    "duplicate headlines report both values when an invoice number is reused for unequal payments",
+    "distinct monthly invoices do not trigger duplicates",
+    "vendor trend detects rising monthly costs with flat invoice sizes",
+    "quality fixes remove recurring noise and retain all planted cases"
+   ]
+  }
+ ],
+ "summary": [
+  "35 pass",
+  "0 fail",
+  "483 expect() calls",
+  "Ran 35 tests across 4 files. [3.16s]"
+ ]
+}
