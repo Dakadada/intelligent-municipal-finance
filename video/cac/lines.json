@@ -1,0 +1,122 @@
+[
+ {
+  "id": 1,
+  "speaker": "david",
+  "picture": "3D: dots appear out of the dark. *Willow Creek, Iowa \u00b7 1,885 payments \u00b7 five years*",
+  "text": "This is five years of spending from one small Iowa town. Every dot is a payment."
+ },
+ {
+  "id": 2,
+  "speaker": "alex",
+  "picture": "3D: 99 tiles, 91 turn red. *91 of Iowa's 99 counties saw property taxes rise in 2024.*",
+  "text": "In 2024, property taxes went up in 91 of Iowa's 99 counties. Families are paying more, and they deserve to know every dollar is spent well."
+ },
+ {
+  "id": 3,
+  "speaker": "david",
+  "picture": "3D: dots pulse, a counter ticks up to *$127,000 in duplicate payments, unnoticed for three years*",
+  "text": "But three out of four Iowa towns have fewer than 2,500 people and no financial analyst. In one county, $127,000 in duplicate payments went unnoticed for three years."
+ },
+ {
+  "id": 4,
+  "speaker": "srihari",
+  "picture": "3D: dots dim. *No one has time to read every line.*",
+  "text": "Because no one has time to read every line."
+ },
+ {
+  "id": 5,
+  "speaker": "alex",
+  "picture": "3D: a red scanning plane sweeps through every payment, circling the findings, then the paper card *1,885 transactions read. 20 need you.*",
+  "text": "Red Pen does."
+ },
+ {
+  "id": 6,
+  "speaker": "david",
+  "picture": "TEAM card: David's tile lights up, name appears",
+  "text": "I'm David Shi,"
+ },
+ {
+  "id": 7,
+  "speaker": "srihari",
+  "picture": "TEAM card: Srihari's tile",
+  "text": "I'm Srihari Kumaresan,"
+ },
+ {
+  "id": 8,
+  "speaker": "alex",
+  "picture": "TEAM card: Alex's tile, then the Red Pen logo",
+  "text": "and I'm Alex Du, and we built Red Pen."
+ },
+ {
+  "id": 9,
+  "speaker": "david",
+  "picture": "BUBBLE over slide \"Who it's for\": three cards slide in (City clerks \u00b7 Councils \u00b7 Taxpayers)",
+  "text": "Red Pen reads every payment a city makes and marks only the ones a person should review. It's built for city clerks, finance officers, and councils in small towns that can't afford an auditor on staff."
+ },
+ {
+  "id": 10,
+  "speaker": "alex",
+  "picture": "BUBBLE: the town's spending export in a spreadsheet (Check Date, Payee Name, Net Amount, 1,885 rows), the file flies into Red Pen's upload box, the import summary appears",
+  "text": "A clerk starts by dropping in the city's spending file, exported straight from their accounting software. Here's five years of books from our test town."
+ },
+ {
+  "id": 11,
+  "speaker": "srihari",
+  "picture": "BUBBLE: reading animation, zoom to \"1,885 transactions read. 20 need you.\" Pop-up: *1,885 read \u00b7 20 flagged \u00b7 1 second*",
+  "text": "In about a second, Red Pen reads all 1,885 payments and finds 20 worth a look. Every finding explains itself in plain English."
+ },
+ {
+  "id": 12,
+  "speaker": "alex",
+  "picture": "BUBBLE: opens the duplicate payment, zooms on the reasons (pop-up *$4,645 \u00d7 2 \u00b7 12 days apart*), types a note, clicks Mark reviewed",
+  "text": "This janitorial invoice was paid twice, twelve days apart. The clerk checks the numbers, adds a note, and marks it reviewed, and the decision goes into an audit log. Red Pen never blocks a payment. People decide."
+ },
+ {
+  "id": 13,
+  "speaker": "srihari",
+  "picture": "BUBBLE: Vendors (pop-up *Bobs Plumbing = Bob's Plumbing Service*), Spending patterns (July snow bill circled), Budget runway (pop-up *Runs out: April*)",
+  "text": "It catches what a spreadsheet misses: the same plumber under two spellings, a snow-removal bill in July, and a fire-truck repair budget on track to run out in April."
+ },
+ {
+  "id": 14,
+  "speaker": "alex",
+  "picture": "BUBBLE: Contracts view, red underlines and margin notes appear",
+  "text": "And before the council signs a contract, it underlines risky terms, like automatic renewal with no new bid."
+ },
+ {
+  "id": 15,
+  "speaker": "srihari",
+  "picture": "BUBBLE over slide \"How it works\": spending file \u2192 four models + Iowa State Auditor rules \u2192 plain-English findings \u2192 a person decides. Each model's name pops in as it's said",
+  "text": "Under the hood are four models we wrote from scratch in JavaScript, with no machine-learning libraries: an Isolation Forest for unusual payments, gradient-boosted trees that learn each month's normal spending, a seasonal ARIMA forecast for budgets, and a naive Bayes classifier for contracts."
+ },
+ {
+  "id": 16,
+  "speaker": "david",
+  "picture": "BUBBLE: the real source code in a VS Code-style editor, scrolling `isolationForest.js`",
+  "text": "Every flag still comes with a reason a clerk can check by hand."
+ },
+ {
+  "id": 17,
+  "speaker": "alex",
+  "picture": "BUBBLE: a browser window with a lock icon; pop-up *No server \u00b7 data stays on your computer*",
+  "text": "It all runs in the browser, so a city's data never leaves its computer."
+ },
+ {
+  "id": 18,
+  "speaker": "david",
+  "picture": "BUBBLE: the 10-of-10 checklist ticks down, then a terminal runs the real test suite: *35 pass, 0 fail*",
+  "text": "To test it honestly, we planted ten real-world problems in our test town's books. Red Pen caught all ten, and 35 automated tests check the code."
+ },
+ {
+  "id": 19,
+  "speaker": "srihari",
+  "picture": "BUBBLE over the closing slide: parks, roads, schools icons; recap *1,885 read \u00b7 20 flagged \u00b7 10 of 10 caught*",
+  "text": "Every dollar a small town saves stays in its parks, its roads, and its schools, instead of coming out of higher property taxes."
+ },
+ {
+  "id": 20,
+  "speaker": "david",
+  "picture": "Final card: Red Pen logo, *Every line, read.*, redpenapp.vercel.app, three names",
+  "text": "Red Pen. Every line, read."
+ }
+]

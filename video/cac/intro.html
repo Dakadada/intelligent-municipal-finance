@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Red Pen · CAC opening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Public+Sans:wght@400;600&family=Caveat:wght@700&display=swap">
+<style>
+  /* The Congressional App Challenge cold open, built on David's hook.html.
+     Same 3D ledger (every dot is one of the sample town's real payments);
+     new type and timing to match the narration, a 99-county tile chart for
+     the property-tax line, and a full-height scanning plane for the pen. */
+  :root {
+    --night: #070b09;
+    --ink-light: #e8efe9;
+    --dim: #8fa598;
+    --pencil: #ff5a4a;
+    --paper: #eef3ee;
+    --ink: #15212a;
+    --serif: "Source Serif 4", Georgia, serif;
+    --sans: "Public Sans", system-ui, sans-serif;
+    --pen: "Caveat", cursive;
+  }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--night); }
+  canvas { position: absolute; inset: 0; }
+  .bar { position: absolute; left: 0; right: 0; height: 138px; background: #000; z-index: 3; }
+  .bar.top { top: 0; } .bar.bottom { bottom: 0; }
+  .line {
+    position: absolute; left: 0; right: 0; z-index: 4; text-align: center;
+    font-family: var(--serif); color: var(--ink-light); font-size: 56px; letter-spacing: -0.005em;
+    opacity: 0; will-change: opacity, transform;
+    text-shadow: 0 0 28px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.8), 0 2px 4px rgba(0,0,0,.7);
+  }
+  .line.low { bottom: 190px; }
+  .line em { font-style: italic; color: #fff; }
+  .line b { font-weight: 600; color: #fff; }
+  .line .red { color: var(--pencil); }
+  .line .src { display: block; margin-top: 14px; font-family: var(--sans); font-size: 17px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+  .small { font-family: var(--sans); font-size: 22px; letter-spacing: .28em; text-transform: uppercase; color: var(--dim); }
+  .pen { font-family: var(--pen); color: var(--pencil); font-size: 92px; }
+  /* 99 tiles, one per county: a count, not a map. */
+  #waffle {
+    position: absolute; z-index: 4; left: 50%; top: 214px; transform: translateX(-50%);
+    display: grid; grid-template-columns: repeat(11, 34px); gap: 9px; opacity: 0;
+  }
+  #waffle i { width: 34px; height: 34px; border-radius: 5px; border: 1.5px solid rgba(232,239,233,.32); box-sizing: border-box; display: block; }
+  #waffle i.on { border-color: transparent; background: #ff5a4a; box-shadow: 0 0 18px rgba(255,90,74,.55); }
+  #card {
+    position: absolute; inset: 0; z-index: 6; background: var(--paper); opacity: 0;
+    display: grid; place-content: center; gap: 34px; justify-items: start; padding: 0 260px;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 63px, #d4e1d6 63px 64px);
+  }
+  #card h1 { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 118px; line-height: 1.34; color: var(--ink); letter-spacing: -0.02em; }
+  #card .circled { position: relative; color: #c8312b; white-space: nowrap; }
+  /* The loop sits outside the glyphs (the old box let its top stroke cut through "20"). */
+  #card .circled svg { position: absolute; left: -5%; top: 4%; width: 110%; height: 104%; overflow: visible; }
+  #card .sig { display: flex; gap: 22px; align-items: center; font-family: var(--sans); color: #47575e; font-size: 26px; }
+  #card .sig b { font-family: var(--serif); font-size: 40px; color: var(--ink); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="bar top" id="bar-top"></div>
+<div class="bar bottom" id="bar-bottom"></div>
+
+<div id="waffle" aria-hidden="true"></div>
+<div class="line low" id="t1"><span class="small">Willow Creek, Iowa · 1,885 payments · five years</span></div>
+<div class="line low" id="t2"><b>91</b> of Iowa's 99 counties saw property taxes rise in 2024.</div>
+<div class="line low" id="t3"><b id="counter">$0</b> in duplicate payments, unnoticed for three years.<span class="src">One Iowa county · Iowa State Auditor</span></div>
+<div class="line low" id="t4">No one has time to read every line.</div>
+<div class="line low" id="t5"><span class="pen">Red Pen does.</span></div>
+
+<div id="card">
+  <h1 id="card-h1"></h1>
+  <div class="sig"><svg width="58" height="58" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="12" fill="#15212a"/><path d="M14 22h36M14 32h36M14 42h36" stroke="#a9c2ae" stroke-width="2"/><path d="M12 36c2-14 34-18 40-8 5 9-14 18-30 15-9-2-11-8-6-14" fill="none" stroke="#ff6a5c" stroke-width="3.5" stroke-linecap="round"/></svg><b>Red Pen</b><span>Intelligent Municipal Finance</span></div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { loadSampleLedger, runAnalysis } from "../../app/js/engine.js";
+import { loopPath, loopPoints } from "../../app/js/ui/pen.js";
+import { makeRng } from "../../app/js/algo/rng.js";
+
+const W = 1920, H = 1080;
+
+// ---------- timing: one start/end per narrated line, set from the real takes ----------
+// ?cues={"l1":[0.6,5.6],...} overrides these defaults (seconds into the opening).
+const DEFAULT_CUES = { l1: [0.6, 5.4], l2: [5.9, 13.6], l3: [14.1, 23.2], l4: [23.7, 25.9], l5: [26.5, 27.5] };
+const CUES = { ...DEFAULT_CUES, ...JSON.parse(new URLSearchParams(location.search).get("cues") || "{}") };
+const S0 = CUES.l5[0] - 0.5;          // the pen starts reading just before "Red Pen does."
+const S1 = S0 + 5.6;                  // and finishes the last fiscal year
+const CRANE = S1 + 3.4;               // overhead shot over the flattened ledger
+const CARD = S1 + 3.3;                // paper card fades up
+export const DURATION = S1 + 6.6;
+window.DURATION = DURATION;
+
+// ---------- real data: the same ledger and findings the app shows ----------
+const ledger = loadSampleLedger();
+const analysis = runAnalysis(ledger);
+const flaggedIds = new Set(analysis.alerts.filter((a) => a.txnIds.length).map((a) => a.txnIds[0]));
+const txns = analysis.txns;
+const cats = [...new Set(txns.map((t) => t.categoryId))];
+const t0 = Date.parse(txns[0].date), t1 = Date.parse(txns.at(-1).date);
+const rng = makeRng(7);
+const LEN = 64, LANE = 2.1;
+const yOf = (amount) => (Math.log10(Math.max(amount, 50)) - 1.7) * 3.4;
+const pos = (t) => new THREE.Vector3(
+  ((Date.parse(t.date) - t0) / (t1 - t0)) * LEN - LEN / 2,
+  yOf(t.amount),
+  (cats.indexOf(t.categoryId) - (cats.length - 1) / 2) * LANE + (rng() - 0.5) * 0.5,
+);
+const TOP = yOf(Math.max(...txns.map((t) => t.amount))) + 1.6; // the scanning plane clears the largest payment
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070b09);
+scene.fog = new THREE.FogExp2(0x070b09, 0.016);
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.05, 400);
+const overlay = new THREE.Scene();
+
+// ---------- the ledger cloud ----------
+const N = txns.length;
+const geo = new THREE.BufferGeometry();
+const base = new Float32Array(N * 3), flat = new Float32Array(N * 3), flag = new Float32Array(N), ignite = new Float32Array(N), seed = new Float32Array(N);
+const flaggedPts = [];
+txns.forEach((t, i) => {
+  const p = pos(t);
+  base.set([p.x, p.y, p.z], i * 3);
+  flat.set([p.x, 0.02, p.z], i * 3);
+  flag[i] = flaggedIds.has(t.id) ? 1 : 0;
+  seed[i] = rng();
+  if (flag[i]) flaggedPts.push({ i, p });
+});
+flaggedPts.sort((a, b) => a.p.x - b.p.x);
+geo.setAttribute("position", new THREE.BufferAttribute(base, 3));
+geo.setAttribute("aFlat", new THREE.BufferAttribute(flat, 3));
+geo.setAttribute("flag", new THREE.BufferAttribute(flag, 1));
+geo.setAttribute("ignite", new THREE.BufferAttribute(ignite, 1));
+geo.setAttribute("seed", new THREE.BufferAttribute(seed, 1));
+
+const pointsMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 }, uDim: { value: 1 }, uFlatten: { value: 0 }, uReveal: { value: 0 }, uScanX: { value: -999 }, uPulse: { value: 0 } },
+  vertexShader: `
+    attribute vec3 aFlat; attribute float flag; attribute float ignite; attribute float seed;
+    uniform float uTime, uFlatten, uReveal, uScanX, uPulse; varying float vFlag; varying float vIgnite; varying float vAlpha; varying float vScan;
+    void main() {
+      vec3 p = mix(position, aFlat, uFlatten);
+      p.y += sin(uTime * 0.6 + seed * 6.283) * 0.05 * (1.0 - uFlatten);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float pulse = uPulse * (0.5 + 0.5 * sin(uTime * 5.0 + seed * 40.0));
+      float size = mix(5.0, 9.0, seed) + ignite * 16.0 + pulse * 3.0;
+      gl_PointSize = size * (34.0 / -mv.z);
+      vFlag = flag; vIgnite = ignite;
+      vScan = exp(-pow((position.x - uScanX) * 1.1, 2.0));
+      vAlpha = smoothstep(seed * 0.9, seed * 0.9 + 0.1, uReveal);
+    }`,
+  fragmentShader: `
+    uniform float uDim; varying float vFlag; varying float vIgnite; varying float vAlpha; varying float vScan;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float a = smoothstep(0.5, 0.0, d);
+      vec3 ledger = vec3(0.62, 0.74, 0.66);
+      vec3 red = vec3(1.6, 0.38, 0.30);
+      // every dot flares as the pen passes it: the whole book gets read, not a sample
+      vec3 col = mix(ledger * uDim + vec3(1.2, 1.0, 0.95) * vScan * 1.3, red, vIgnite);
+      gl_FragColor = vec4(col, a * vAlpha * mix(0.75, 1.0, vIgnite));
+    }`,
+});
+scene.add(new THREE.Points(geo, pointsMat));
+
+// ---------- ledger rules: one faint line per category lane, fiscal-year ticks ----------
+const rules = new THREE.Group();
+const ruleMat = new THREE.LineBasicMaterial({ color: 0x2f4a3c, transparent: true, opacity: 0.55 });
+cats.forEach((_, k) => {
+  const z = (k - (cats.length - 1) / 2) * LANE;
+  rules.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-LEN / 2 - 2, 0, z), new THREE.Vector3(LEN / 2 + 2, 0, z)]), ruleMat));
+});
+for (let y = 2022; y <= 2026; y++) {
+  const x = ((Date.UTC(y - 1, 6, 1) - t0) / (t1 - t0)) * LEN - LEN / 2;
+  rules.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, 0, -cats.length * LANE / 2), new THREE.Vector3(x, 0, cats.length * LANE / 2)]), ruleMat));
+}
+scene.add(rules);
+
+// ---------- the red pen: a scanning plane that passes through every payment ----------
+const X0 = -LEN / 2 - 3, X1 = LEN / 2 + 3;
+const depth = cats.length * LANE + 4;
+const beam = new THREE.Group();
+// The sheet: spans every lane (z) and every payment height (y); a soft red curtain.
+const sheetMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
+  uniforms: { uOpacity: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform float uOpacity; varying vec2 vUv;
+    void main(){
+      float sideFade = smoothstep(0.0, 0.05, vUv.x) * smoothstep(1.0, 0.95, vUv.x);
+      float body = mix(0.075, 0.018, vUv.y);                      // a faint curtain, densest at the floor
+      float rim = exp(-pow((1.0 - vUv.y) * 40.0, 2.0)) * 0.5;     // bright top edge
+      float scan = 0.5 + 0.5 * sin(vUv.y * 90.0);                 // faint scanlines
+      vec3 col = vec3(1.7, 0.36, 0.27);
+      gl_FragColor = vec4(col, (body * (0.75 + 0.25 * scan) + rim) * sideFade * uOpacity);
+    }`,
+});
+const sheet = new THREE.Mesh(new THREE.PlaneGeometry(depth, TOP), sheetMat);
+sheet.rotation.y = Math.PI / 2;
+sheet.position.y = TOP / 2;
+beam.add(sheet);
+// Bright edges: floor line, top line, and the two uprights, so the frame reads at any angle.
+const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 0.75, 0.55), toneMapped: false, transparent: true });
+const floorEdge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, depth), edgeMat);
+floorEdge.position.y = 0.02;
+const topEdge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, depth), edgeMat);
+topEdge.position.y = TOP;
+const upA = new THREE.Mesh(new THREE.BoxGeometry(0.035, TOP, 0.035), edgeMat);
+upA.position.set(0, TOP / 2, depth / 2);
+const upB = upA.clone();
+upB.position.z = -depth / 2;
+beam.add(floorEdge, topEdge, upA, upB);
+scene.add(beam);
+
+// hand-drawn loops around each flagged point (billboards, drawn on as the pen passes)
+const flagX = flaggedPts.map(({ p }) => p.x);
+const loops = flaggedPts.map(({ p }, k) => {
+  const pts = loopPoints(1.5, 1.0, k + 3).map(([x, y]) => new THREE.Vector3(x - 0.75, -(y - 0.5), 0));
+  const smooth = new THREE.CatmullRomCurve3(pts).getPoints(90);
+  const g = new LineGeometry();
+  g.setPositions(smooth.flatMap((v) => [v.x, v.y, v.z]));
+  const mat = new LineMaterial({ color: 0xff5a4a, linewidth: 3.2, transparent: true, toneMapped: false, depthTest: false });
+  mat.resolution.set(W, H);
+  const line = new Line2(g, mat);
+  line.position.copy(p);
+  line.renderOrder = 5;
+  g.instanceCount = 0;
+  overlay.add(line);
+  return line;
+});
+
+// ---------- film post stack: DOF -> bloom -> grade (vignette, grain) ----------
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(1);
+composer.setSize(W, H);
+composer.addPass(new RenderPass(scene, camera));
+const bokeh = new BokehPass(scene, camera, { focus: 10, aperture: 0.0025, maxblur: 0.012 });
+composer.addPass(bokeh);
+const overlayPass = new RenderPass(overlay, camera);
+overlayPass.clear = false;
+overlayPass.clearDepth = true;
+composer.addPass(overlayPass);
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.9, 0.55, 0.82);
+composer.addPass(bloom);
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uFade: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime; uniform float uFade; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uTime * 7.13) * 43758.5453); }
+    void main(){
+      vec2 c = vUv - 0.5;
+      float ca = 0.0012 * length(c) * 2.0;
+      vec3 col;
+      col.r = texture2D(tDiffuse, vUv + c * ca).r;
+      col.g = texture2D(tDiffuse, vUv).g;
+      col.b = texture2D(tDiffuse, vUv - c * ca).b;
+      col *= smoothstep(0.95, 0.25, length(c * vec2(1.0, 0.82)));
+      col = mix(col, col * vec3(0.96, 1.02, 1.0), 0.5);
+      col += (hash(vUv * 1000.0) - 0.5) * 0.03;
+      gl_FragColor = vec4(col * uFade, 1.0);
+    }`,
+});
+composer.addPass(grade);
+composer.addPass(new OutputPass());
+
+// ---------- the 99-county tile chart ----------
+const waffle = document.getElementById("waffle");
+const order = Array.from({ length: 99 }, (_, i) => i);
+const wr = makeRng(91);
+for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(wr() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+const fillRank = new Array(99);
+order.forEach((tile, rank) => (fillRank[tile] = rank)); // the first 91 in this order turn red
+const tiles = Array.from({ length: 99 }, () => waffle.appendChild(document.createElement("i")));
+
+// ---------- timeline helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const lerp = (a, b, x) => a + (b - a) * x;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const firstPt = pos(txns[Math.floor(N * 0.42)]);
+const KEYS = [
+  { t: 0, p: firstPt.clone().add(V(0.4, 0.15, 1.1)), l: firstPt, f: 1.2 },
+  { t: CUES.l1[1] + 0.2, p: V(-6, 9, 34), l: V(0, 3, 0), f: 34 },
+  { t: CUES.l3[0], p: V(4, 14, 44), l: V(0, 4, 0), f: 44 },      // pulled back behind the tile chart
+  { t: CUES.l4[0], p: V(26, 5.5, 20), l: V(4, 4, -2), f: 28 },
+  { t: S0, p: V(-34, 7, 16), l: V(-18, 5, 0), f: 20 },
+  { t: S1 + 0.6, p: V(28, 12, 18), l: V(12, 5, 0), f: 20 },
+  { t: CRANE, p: V(0, 78, 0.01), l: V(0, 0, 0), f: 78 },
+];
+function rig(t) {
+  let k = 0;
+  while (k < KEYS.length - 2 && t > KEYS[k + 1].t) k++;
+  const a = KEYS[k], b = KEYS[k + 1];
+  const x = ease(ramp(t, a.t, b.t));
+  return { p: a.p.clone().lerp(b.p, x), l: a.l.clone().lerp(b.l, x), f: lerp(a.f, b.f, x) };
+}
+
+// Each line fades in as it is spoken and out shortly after.
+const text = (id, t, [a, b], fade = 0.5) => {
+  const el = document.getElementById(id);
+  const o = clamp(Math.min((t - a + 0.25) / fade, (b + 0.45 - t) / fade));
+  el.style.opacity = o;
+  el.style.transform = `translateY(${(1 - easeOut(clamp((t - a + 0.25) / 1.0))) * 14}px)`;
+};
+
+let cardBuilt = false;
+function buildCard() {
+  const read = analysis.summary.txnCount.toLocaleString("en-US");
+  const need = analysis.alerts.length;
+  document.getElementById("card-h1").innerHTML =
+    `${read} transactions read.<br><span class="circled">${need} need you.<svg viewBox="0 0 200 60" preserveAspectRatio="none"><path id="card-loop" d="${loopPath(200, 60, need)}" fill="none" stroke="#c8312b" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg></span>`;
+  cardBuilt = true;
+}
+
+// ---------- render one exact frame at time t (seconds) ----------
+window.renderAt = (t) => {
+  if (!cardBuilt) buildCard();
+  const [l2a, l2b] = CUES.l2, [l3a, l3b] = CUES.l3, [l4a] = CUES.l4;
+  pointsMat.uniforms.uTime.value = t;
+  pointsMat.uniforms.uReveal.value = easeOut(ramp(t, 0.4, CUES.l1[1]));
+  // dim behind the tile chart, come back for the duplicate line, dim again for "no one reads"
+  const dimChart = ease(ramp(t, l2a, l2a + 0.8)) * (1 - ease(ramp(t, l2b, l2b + 0.8)));
+  const dimLate = ease(ramp(t, l4a, l4a + 1.2));
+  pointsMat.uniforms.uDim.value = lerp(1, 0.32, Math.max(dimChart, dimLate));
+  pointsMat.uniforms.uPulse.value = ramp(t, l3a, l3a + 0.6) * (1 - ramp(t, l3b, l3b + 0.6));
+  pointsMat.uniforms.uFlatten.value = ease(ramp(t, S1 + 0.8, CRANE));
+  ruleMat.opacity = 0.7 * ramp(t, 1.5, 5);
+
+  const su = ease(ramp(t, S0, S1));
+  const scanX = lerp(X0, X1, su);
+  let { p, l, f } = rig(t);
+  if (t > S0 - 0.2 && t < S1 + 0.6) {
+    // track the pen from behind and above, wide enough to see the whole sheet
+    const w = ease(ramp(t, S0 - 0.2, S0 + 1.0)) * (1 - ease(ramp(t, S1 - 0.4, S1 + 0.6)));
+    const trackP = V(scanX - 14, 15, 38);
+    const trackL = V(scanX + 4, 4, 0);
+    p = p.lerp(trackP, w);
+    l = l.lerp(trackL, w);
+    f = lerp(f, trackP.distanceTo(V(scanX, 4, 0)), w);
+  }
+  camera.position.copy(p);
+  camera.lookAt(l);
+  camera.updateMatrixWorld();
+
+  const beamOn = ramp(t, S0 - 0.1, S0 + 0.5) * (1 - ramp(t, S1 - 0.3, S1 + 0.3));
+  pointsMat.uniforms.uScanX.value = beamOn > 0 ? scanX : -999;
+  beam.position.x = scanX;
+  beam.visible = beamOn > 0;
+  sheetMat.uniforms.uOpacity.value = beamOn;
+  edgeMat.opacity = beamOn;
+  const ig = geo.attributes.ignite;
+  flaggedPts.forEach(({ i }, k) => {
+    ig.array[i] = beamOn > 0 || t > S1 ? clamp((scanX - flagX[k]) * 1.6) : 0;
+    const loop = loops[k];
+    loop.geometry.instanceCount = t < S0 ? 0 : Math.floor(easeOut(clamp((scanX - flagX[k]) * 0.5)) * 90);
+    loop.material.opacity = 1 - ramp(t, S1 + 1.6, S1 + 3.0);
+    loop.quaternion.copy(camera.quaternion);
+    const fl = pointsMat.uniforms.uFlatten.value;
+    loop.position.copy(flaggedPts[k].p).lerp(V(flaggedPts[k].p.x, 0.02, flaggedPts[k].p.z), fl);
+  });
+  ig.needsUpdate = true;
+
+  bokeh.uniforms.focus.value = f;
+  bokeh.uniforms.aperture.value = lerp(0.0045, 0.0012, ramp(t, 0, 5)) * lerp(1, 0.3, beamOn) * (t > S1 ? 1 - ramp(t, S1, S1 + 2) : 1);
+  bloom.strength = lerp(0.55, 0.85, beamOn) * (1 - 0.5 * ramp(t, S1 + 1, S1 + 3));
+
+  grade.uniforms.uTime.value = Math.floor(t * 24) / 24;
+  grade.uniforms.uFade.value = ramp(t, 0, 0.8) * (1 - ramp(t, CARD - 0.1, CARD + 0.7));
+
+  // type, timed to the narration
+  text("t1", t, CUES.l1);
+  text("t2", t, CUES.l2);
+  text("t3", t, CUES.l3);
+  text("t4", t, CUES.l4);
+  text("t5", t, [CUES.l5[0], S1 - 0.6]);
+  const dollars = Math.round(127000 * easeOut(ramp(t, l3a + 0.3, l3a + 2.0)) / 100) * 100;
+  document.getElementById("counter").textContent = "$" + dollars.toLocaleString("en-US");
+
+  // the tile chart: 91 of 99 turn red while the line is spoken
+  waffle.style.opacity = ramp(t, l2a - 0.1, l2a + 0.5) * (1 - ramp(t, l2b + 0.1, l2b + 0.7));
+  const lit = Math.round(91 * easeOut(ramp(t, l2a + 0.5, l2a + 0.5 + Math.min(3.2, (l2b - l2a) * 0.5))));
+  tiles.forEach((el, k) => el.classList.toggle("on", fillRank[k] < lit));
+
+  // letterbox opens out for the final card
+  const bars = 138 * (1 - ease(ramp(t, CARD - 0.2, CARD + 0.8)));
+  document.getElementById("bar-top").style.height = `${bars}px`;
+  document.getElementById("bar-bottom").style.height = `${bars}px`;
+
+  const card = document.getElementById("card");
+  card.style.opacity = ramp(t, CARD, CARD + 0.8);
+  const loopEl = document.getElementById("card-loop");
+  if (loopEl) {
+    const len = 620;
+    loopEl.style.strokeDasharray = len;
+    loopEl.style.strokeDashoffset = len * (1 - ease(ramp(t, CARD + 1.0, CARD + 2.0)));
+  }
+
+  composer.render();
+};
+
+window.hookReady = true;
+window.renderAt(0);
+</script>
+</body>
+</html>

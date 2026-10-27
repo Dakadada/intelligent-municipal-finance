@@ -2,3 +2,13 @@ frames/
 out/
 node_modules/
 *.mp4
+# CAC video v3: raw takes (team faces), screen recordings, renders and generated audio stay local
+takes/
+*.mov
+*.MOV
+*.wav
+.tmp/
+.frames/
+cac/remotion/public/face/
+cac/remotion/public/still/
+__pycache__/
